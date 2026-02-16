@@ -1,11 +1,17 @@
-html, body {
-  height: 100%;
-}
+/* style.css */
 
-body {
-  background-color: #fff;
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+html, body {
+    height: 100%;
+  }
+  
+  body {
+    background-color: #ffffff;
+    margin: 0;
+    display: flex;
+  
+    /* This centers our sketch horizontally. */
+    justify-content: center;
+  
+    /* This centers our sketch vertically. */
+    align-items: center;
+  }

@@ -1,29 +1,31 @@
 // display.js
+// Aggregates visual info before drawing it.
+// Supports "transparent" pixels via null (so track can show through gaps).
 
 class Display {
   constructor(_displaySize, _pixelSize) {
     this.displaySize = _displaySize;
     this.pixelSize = _pixelSize;
-
-    // IMPORTANT: null = transparent pixel (we won't draw a rect there)
-    this.displayBuffer = new Array(this.displaySize).fill(null);
+    this.initColor = color(0, 0, 0); // black
+    this.displayBuffer = new Array(this.displaySize).fill(this.initColor);
   }
 
-  setPixel(_index, _colorOrNull) {
-    this.displayBuffer[_index] = _colorOrNull; // can be a p5 color OR null
+  setPixel(_index, _color) {
+    if (_index < 0 || _index >= this.displaySize) return;
+    this.displayBuffer[_index] = _color; // may be null for transparency
   }
 
-  setAllPixels(_colorOrNull) {
+  setAllPixels(_color) {
     for (let i = 0; i < this.displaySize; i++) {
-      this.setPixel(i, _colorOrNull);
+      this.setPixel(i, _color);
     }
   }
 
+  // yOffset lets the 1D row be drawn anywhere vertically
   show(yOffset = 0) {
-    noStroke();
     for (let i = 0; i < this.displaySize; i++) {
       const c = this.displayBuffer[i];
-      if (c === null) continue;         // <-- transparent pixel, don't draw
+      if (c === null || c === undefined) continue; // transparent
       fill(c);
       rect(i * this.pixelSize, yOffset, this.pixelSize, this.pixelSize);
     }
@@ -31,7 +33,7 @@ class Display {
 
   clear() {
     for (let i = 0; i < this.displaySize; i++) {
-      this.displayBuffer[i] = null;
+      this.displayBuffer[i] = this.initColor;
     }
   }
 }

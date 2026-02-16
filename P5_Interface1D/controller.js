@@ -1,154 +1,20 @@
-
-// This is where your state machines and game logic lives
-
-
-class Controller {
-
-    // This is the state we start with.
-    constructor() {
-        this.gameState = "PLAY";
-       
-    }
-    
-    // This is called from draw() in sketch.js with every frame
-    update() {
-
-        // STATE MACHINE ////////////////////////////////////////////////
-        // This is where your game logic lives
-        /////////////////////////////////////////////////////////////////
-        switch(this.gameState) {
-
-            // This is the main game state, where the playing actually happens
-            case "PLAY":
-
-                // clear screen at frame rate so we always start fresh      
-                display.clear();
-            
-                // show all players in the right place, by adding them to display buffer
-                display.setPixel(playerOne.position, playerOne.playerColor);
-                display.setPixel(playerTwo.position, playerTwo.playerColor);
-                
-
-                // now add the target
-                display.setPixel(target.position, target.playerColor);
-
-                
-                // check if player has caught target
-                if (playerOne.position == target.position)  {
-                    playerOne.score++;              // increment score
-                    this.gameState = "COLLISION";   // go to COLLISION state
-                }
-                
-                // check if other player has caught target        
-                if (playerTwo.position == target.position)  {
-                    playerTwo.score++;              // increment their score
-                    this.gameState = "COLLISION";   // go to COLLISION state
-                }
-
-                break;
-
-            // This state is used to play an animation, after a target has been caught by a player 
-            case "COLLISION":
-                
-                 // clear screen at frame rate so we always start fresh      
-                 display.clear();
-
-                // play explosion animation one frame at a time.
-                // first figure out what frame to show
-                let frameToShow = collisionAnimation.currentFrame();    // this grabs number of current frame and increments it 
-                
-                // then grab every pixel of frame and put it into the display buffer
-                for(let i = 0; i < collisionAnimation.pixels; i++) {
-                    display.setPixel(i,collisionAnimation.animation[frameToShow][i]);                    
-                }
-
-                //check if animation is done and we should move on to another state
-                if (frameToShow == collisionAnimation.animation.length-1)  {
-                    
-                    // We've hit score max, this player wins
-                    if (playerOne.score >= score.max) {
-                        score.winner = playerOne.playerColor;   // store winning color in score.winner
-                        this.gameState = "SCORE";               // go to state that displays score
-                    
-                    // We've hit score max, this player wins
-                    } else if (playerTwo.score >= score.max) {
-                        score.winner = playerTwo.playerColor;   // store winning color in score.winner
-                        this.gameState = "SCORE";               // go to state that displays score
-
-                    // We haven't hit the max score yet, keep playing    
-                    } else {
-                        target.position = parseInt(random(0,displaySize));  // move the target to a new random position
-                        this.gameState = "PLAY";    // back to play state
-                    }
-                } 
-
-                break;
-
-            // Game is over. Show winner and clean everything up so we can start a new game.
-            case "SCORE":       
-            
-                // reset everyone's score
-                playerOne.score = 0;
-                playerTwo.score = 0;
-
-                // put the target somewhere else, so we don't restart the game with player and target in the same place
-                target.position = parseInt(random(1,displaySize));
-
-                //light up w/ winner color by populating all pixels in buffer with their color
-                display.setAllPixels(score.winner);                    
-
-                break;
-
-            // Not used, it's here just for code compliance
-            default:
-                break;
-        }
-    }
-}
-
-
-
-
-// This function gets called when a key on the keyboard is pressed
-function keyPressed() {
-
-    // Move player one to the left if letter A is pressed
-    if (key == 'A' || key == 'a') {
-        playerOne.move(-1);
-      }
-    
-    // And so on...
-    if (key == 'D' || key == 'd') {
-    playerOne.move(1);
-    }    
-
-    if (key == 'J' || key == 'j') {
-    playerTwo.move(-1);
-    }
-    
-    if (key == 'L' || key == 'l') {
-    playerTwo.move(1);
-    }
-    
-    // When you press the letter R, the game resets back to the play state
-    if (key == 'R' || key == 'r') {
-    controller.gameState = "PLAY";
-    }
-  }
 // controller.js
 
 // ===== EASY TOGGLES (seconds / frames) =====
 let JUMP_TOP_SECONDS = 1.0;
 
-let TRACK_TAP_WINDOW = 0.5;
-let TRACK_DEATH_AFTER = 5.0;
-let RESPAWN_AFTER = 5.0;
+let TRACK_TAP_WINDOW = 0.5;   // must press DOWN at least this often
+let TRACK_DEATH_AFTER = 5.0;  // die after this long without DOWN
+let RESPAWN_AFTER = 5.0;      // respawn delay
 
+// Blink behavior (frames)
 let BLINK_PERIOD_NORMAL = 20;
 let BLINK_PERIOD_PANIC_MIN = 4;
 
+// Lives
 let STARTING_LIVES = 3;
 
+// FPS assumption
 let ASSUMED_FPS = 60;
 
 // ===== TUNNEL TOGGLES =====
@@ -161,28 +27,24 @@ let TUNNEL_SPEED_COLS_PER_SEC = 8.0;
 
 class Controller {
   constructor() {
-    // NEW: Start screen state
     this.gameState = "START"; // START -> PLAY -> GAME_OVER
 
-    // Train layout parameters (in 1D pixels)
+    // Train layout parameters (1D pixels)
     this.wagonLength = 7;
     this.gapLength = 2;
     this.numWagons = 3;
 
     this.wagonGrey = color(180);
 
-    // Computed each frame
     this.wagonMask = new Array(displaySize).fill(false);
     this.leftEdge = new Array(displaySize).fill(false);
     this.rightEdge = new Array(displaySize).fill(false);
 
-    // Timing in frames
     this.jumpFrames = max(1, floor(JUMP_TOP_SECONDS * ASSUMED_FPS));
     this.tapWindowFrames = max(1, floor(TRACK_TAP_WINDOW * ASSUMED_FPS));
     this.deathAfterFrames = max(1, floor(TRACK_DEATH_AFTER * ASSUMED_FPS));
     this.respawnFrames = max(1, floor(RESPAWN_AFTER * ASSUMED_FPS));
 
-    // Tunnel state (scheduled on startGame())
     this.resetTunnelSchedule();
   }
 
@@ -193,7 +55,6 @@ class Controller {
     this.tunnelActive = false;
     this.tunnelDone = false;
 
-    // Spawn off-screen right
     this.tunnelXFloat = displaySize;
     this.tunnelX = floor(this.tunnelXFloat);
 
@@ -203,18 +64,14 @@ class Controller {
   startGame() {
     this.gameState = "PLAY";
 
-    // Reset lives + states
     playerOne.lives = STARTING_LIVES;
     playerTwo.lives = STARTING_LIVES;
 
-    // Ensure layout exists
     this.computeTrainLayout();
-
-    // Spawn on wagons
     this.spawnPlayerOnWagon(playerOne);
     this.spawnPlayerOnWagon(playerTwo, playerOne.position);
 
-    // Start tunnel timer relative to NOW
+    // Schedule tunnel from now
     this.tunnelDone = false;
     this.tunnelActive = false;
     this.tunnelStartFrame = frameCount + floor(TIME_UNTIL_TUNNEL * ASSUMED_FPS);
@@ -294,7 +151,7 @@ class Controller {
       }
     }
 
-    // Move LEFT
+    // Move RIGHT -> LEFT
     this.tunnelXFloat -= this.tunnelSpeedColsPerFrame;
     this.tunnelX = floor(this.tunnelXFloat);
 
@@ -302,6 +159,15 @@ class Controller {
     if ((this.tunnelX + TUNNEL_WIDTH_PIXELS) < 0) {
       this.tunnelActive = false;
       this.tunnelDone = true;
+
+      // 🔁 Schedule next tunnel 10 seconds later
+      const delay = floor(TIME_UNTIL_TUNNEL * ASSUMED_FPS);
+
+      this.tunnelStartFrame = frameCount + delay;
+      this.tunnelWarnFrame =
+        this.tunnelStartFrame - floor(TUNNEL_WARNING_SECONDS * ASSUMED_FPS);
+
+      this.tunnelDone = false;   // allow next tunnel
     }
   }
 
@@ -320,7 +186,7 @@ class Controller {
 
     if (this.gameState !== "PLAY") return;
 
-    // Gameplay ticking only in PLAY
+    // Gameplay only in PLAY
     this.updateTunnel();
 
     tickJumpTimer(playerOne);
@@ -429,7 +295,7 @@ function tryMoveSide(player, dir) {
 
   if (player.mode === "WAGON") {
     if (dir === -1 && controller.leftEdge[pos]) return;
-    if (dir ===  1 && controller.rightEdge[pos]) return;
+    if (dir === 1 && controller.rightEdge[pos]) return;
 
     const next = wrapIndex(pos + dir);
     if (controller.wagonMask[next]) player.position = next;
@@ -485,6 +351,7 @@ function tryJump(player) {
     return;
   }
 
+  // Jump on top of wagon (invisible)
   if (player.mode === "WAGON") {
     player.isAirborne = true;
     player.airborneFramesLeft = controller.jumpFrames;
@@ -494,16 +361,16 @@ function tryJump(player) {
 /* ---------------- Keyboard Controls ---------------- */
 
 function keyPressed() {
-  // SPACE starts the game from START screen
+  // SPACE starts game
   if (controller.gameState === "START") {
-    if (key === ' ' ) controller.startGame();
+    if (key === ' ') controller.startGame();
     return;
   }
 
-  // allow restart from GAME OVER
+  // Game over -> back to start
   if (controller.gameState === "GAME_OVER") {
     if (key === 'R' || key === 'r') {
-      controller.gameState = "START"; // back to start page
+      controller.gameState = "START";
       controller.resetTunnelSchedule();
     }
     return;
@@ -511,13 +378,13 @@ function keyPressed() {
 
   // Player 1
   if (key === 'A' || key === 'a') tryMoveSide(playerOne, -1);
-  if (key === 'D' || key === 'd') tryMoveSide(playerOne,  1);
+  if (key === 'D' || key === 'd') tryMoveSide(playerOne, 1);
   if (key === 'S' || key === 's') handleDownPress(playerOne);
   if (key === 'W' || key === 'w') tryJump(playerOne);
 
   // Player 2
   if (key === 'J' || key === 'j') tryMoveSide(playerTwo, -1);
-  if (key === 'L' || key === 'l') tryMoveSide(playerTwo,  1);
+  if (key === 'L' || key === 'l') tryMoveSide(playerTwo, 1);
   if (key === 'K' || key === 'k') handleDownPress(playerTwo);
   if (key === 'I' || key === 'i') tryJump(playerTwo);
 }
