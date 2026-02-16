@@ -1,7 +1,7 @@
 // controller.js
 
 // ===== EASY TOGGLES (seconds / frames) =====
-let JUMP_TOP_SECONDS = 1.0;
+let JUMP_TOP_SECONDS = 0.5;
 
 let TRACK_TAP_WINDOW = 0.5;
 let TRACK_DEATH_AFTER = 5.0;
