@@ -1,4 +1,6 @@
-# 4.043 Design Studio: Interaction Intelligence
+# team train trip
+
+#4.043 Design Studio: Interaction Intelligence
 
 Overview of core principles and techniques for the design of interaction, behavior and intelligence across objects and spaces. In a studio environment, students develop low and high-fidelity interactive prototypes that can be deployed and experienced by real users. Lectures cover the history and principles of human-computer interaction, behavior prototyping, physical and graphical user interfaces, machine intelligence, neural networks, and large language models. Provides a foundation in technical skills, such as physical prototyping, coding, and electronics, as well as how to collect data, train and deploy your own neural network models. Students complete a small interaction exercise and a portfolio-level final project. 
  
