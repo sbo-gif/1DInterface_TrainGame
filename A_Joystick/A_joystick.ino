@@ -9,20 +9,23 @@ http://www.asciitable.com/
 */
 
 #include <Keyboard.h>      // include library that let's Arduino act as a keyboard
-#include <RotaryEncoder.h> // include rotary encoder library
 
-// Setup a RoraryEncoder for pins A0 and A1:
-RotaryEncoder encoder(A0, A1);
 
 // some useful values
 #define OFF 0
 #define ON 1
 
-// start by assuming no buttons are pressed
-bool keyA = OFF;
-bool keyB = OFF;
-bool keyX = OFF;
-bool keyY = OFF;
+// Direction buttons (wired as INPUT_PULLUP: pressed = LOW, released = HIGH)
+const int UP_PIN    = 14; // W
+const int DOWN_PIN  = 8;  // S
+const int LEFT_PIN  = 7;  // A
+const int RIGHT_PIN = 16; // D
+
+bool upLatched    = OFF;
+bool downLatched  = OFF;
+bool leftLatched  = OFF;
+bool rightLatched = OFF;
+
 
 
 void setup()
@@ -31,13 +34,10 @@ void setup()
   // connect to serial port for debugging
   Serial.begin(57600);
 
-  // make pin 2 an input and turn on the
-  // pullup resistor so it goes high unless
-  // connected to ground:
-  pinMode(2, INPUT_PULLUP);
-  pinMode(3, INPUT_PULLUP);
-  pinMode(4, INPUT_PULLUP);
-  pinMode(5, INPUT_PULLUP);
+  pinMode(UP_PIN, INPUT_PULLUP);
+  pinMode(DOWN_PIN, INPUT_PULLUP);
+  pinMode(LEFT_PIN, INPUT_PULLUP);
+  pinMode(RIGHT_PIN, INPUT_PULLUP);
 
   // start the keyboard
   Keyboard.begin();
@@ -46,70 +46,47 @@ void setup()
 void loop()
 {
 
-  // Read the encoder and output its value
-  /////////////////////////////////////////
-  static int pos = 0;
-  encoder.tick();
 
-  int newPos = encoder.getPosition();
-  if (pos != newPos)
-  {
-    Serial.print(newPos);
-    Serial.println();
+  // All the key presses happen here (pressed = LOW with INPUT_PULLUP)
+  //////////////////////////////////////////////////////////////
 
-    if (newPos > pos)
-    {
-      Keyboard.write(69); // E
-    }
-
-    if (newPos < pos)
-    {
-      Keyboard.write(70); // F
-    }
-
-    pos = newPos;
+  // UP -> W
+  if (digitalRead(UP_PIN) == LOW && upLatched == OFF) {
+    upLatched = ON;
+    Keyboard.write('W');   // or 'w' if your game checks lowercase
+  }
+  if (digitalRead(UP_PIN) == HIGH) {
+    upLatched = OFF;
   }
 
-  // All the key presses happen here
-  //////////////////////////////////////////////
-
-  if ((digitalRead(2) == HIGH) && keyA == OFF)
-  {
-    keyA = ON;
-    Keyboard.write(65); // A
+  // DOWN -> S
+  if (digitalRead(DOWN_PIN) == LOW && downLatched == OFF) {
+    downLatched = ON;
+    Keyboard.write('S');
   }
-  if (digitalRead(2) == LOW)
-  {
-    keyA = OFF;
+  if (digitalRead(DOWN_PIN) == HIGH) {
+    downLatched = OFF;
   }
 
-  if ((digitalRead(3) == HIGH) && keyB == OFF)
-  {
-    keyB = ON;
-    Keyboard.write(68); // D
+  // LEFT -> A
+  if (digitalRead(LEFT_PIN) == LOW && leftLatched == OFF) {
+    leftLatched = ON;
+    Keyboard.write('A');
   }
-  if (digitalRead(3) == LOW)
-  {
-    keyB = OFF;
-  }
-
-  if ((digitalRead(4) == HIGH) && keyX == OFF)
-  {
-    keyX = ON;
-    Keyboard.write(74); // J
-  }
-  if (digitalRead(4) == LOW)
-  {
-    keyX = OFF;
+  if (digitalRead(LEFT_PIN) == HIGH) {
+    leftLatched = OFF;
   }
 
-  if ((digitalRead(5) == HIGH) && keyY == OFF)
-  {
-    keyY = ON;
-    Keyboard.write(76); // L
+  // RIGHT -> D
+  if (digitalRead(RIGHT_PIN) == LOW && rightLatched == OFF) {
+    rightLatched = ON;
+    Keyboard.write('D');
   }
-  if (digitalRead(5) == LOW)
-  {
-    keyY = OFF;
+  if (digitalRead(RIGHT_PIN) == HIGH) {
+    rightLatched = OFF;
   }
+
+  delay(5); // tiny debounce helper
+
+  
 }
