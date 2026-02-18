@@ -31,6 +31,10 @@ let TRACK_STYLE = {
   sleeperStridePx: null
 };
 
+// Árboles/vegetación
+let trees = [];
+let treeOffset = 0;
+
 function setup() {
   // Taller canvas to fit instructions comfortably
   createCanvas(displaySize * pixelSize, pixelSize * 20);
@@ -44,14 +48,17 @@ function setup() {
 
   // Track colors
   TRACK_COLORS.rail = color(0);
-  TRACK_COLORS.sleeper = color(120, 90, 0);
-  TRACK_COLORS.background = color(255);
+  TRACK_COLORS.sleeper = color(120, 90, 20); // Marrón original
+  TRACK_COLORS.background = color(120, 160, 100); // Verde césped pixel art
 
   // Track geometry
   TRACK_STYLE.railThicknessPx = max(3, pixelSize * 0.12);
   TRACK_STYLE.sleeperWidthPx = pixelSize * 0.95;
   TRACK_STYLE.sleeperOverhangPx = pixelSize * 0.55;
   TRACK_STYLE.sleeperStridePx = pixelSize * 2;
+
+  // Inicializar árboles
+  initializeTrees();
 
   // Ensure layout exists for drawing wagons row even on START
   controller.computeTrainLayout();
@@ -62,15 +69,25 @@ function draw() {
 
   // Track animation always running
   sleeperOffset = (sleeperOffset + sleeperSpeed) % (pixelSize * 2);
+  treeOffset = treeOffset + sleeperSpeed; // Árboles se mueven continuamente SIN módulo
 
   // Place the track/train row higher to leave room for instructions
   const yCenter = height * 0.5;
   const yPlayable = yCenter - pixelSize / 2;
 
+  // Dibujar árboles en MÚLTIPLES CAPAS con parallax
+  drawTreeLayer(yCenter, 'far', 0.3, 0.6);        // Capa lejana - 30% velocidad, 60% opacidad
+  drawTreeLayer(yCenter, 'mid', 0.6, 0.75);       // Capa media - 60% velocidad, 75% opacidad
+  drawTreeLayer(yCenter, 'close', 0.85, 0.9);     // Capa cerca - 85% velocidad, 90% opacidad
+
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
   // Controller draws wagons row (and gameplay if in PLAY)
   controller.update();
+  
+  // NO dibujar árboles en píxeles 1D - solo visuales grandes
+  // drawTreePixels(); // COMENTADO - los árboles son solo visuales
+  
   display.show(yPlayable);
 
   if (controller.gameState === "PLAY") {
@@ -82,6 +99,9 @@ function draw() {
 
     drawLivesUI();
   }
+
+  // Dibujar árboles grandes DESPUÉS del tren (primer plano) - cubren las vías
+  drawTreeLayer(yCenter, 'foreground', 1.0, 1.0); // Primer plano - 100% velocidad, opacidad total
 
   if (controller.gameState === "START") {
     drawStartScreenOverlay();
@@ -253,3 +273,185 @@ function drawFatCenterTrackBand(yCenter, offsetPx) {
   rect(0, railTopY, width, railT);
   rect(0, railBottomY, width, railT);
 }
+
+/* ---------------- Árboles/Vegetación ---------------- */
+
+function initializeTrees() {
+  trees = [];
+  const numElements = 60; // Aumentamos para tener más detalle de fondo
+  
+  for (let i = 0; i < numElements; i++) {
+    let layerRand = random();
+    let layer = layerRand < 0.25 ? 'far' : layerRand < 0.5 ? 'mid' : layerRand < 0.75 ? 'close' : 'foreground';
+    
+    // Determinamos si es un árbol real o solo "hierba/detalle"
+    let isDetail = random() > 0.6; 
+
+    trees.push({
+      x: random(width * 2),
+      type: isDetail ? 'detail' : floor(random(3)), // Nuevo tipo 'detail'
+      scale: isDetail ? random(0.2, 0.5) : getScaleByLayer(layer),
+      layer: layer,
+      yPosition: random(['top', 'middle', 'bottom']),
+      detailVariant: floor(random(3)) // Para que no todos los puntitos sean iguales
+    });
+  }
+}
+
+// Función auxiliar para mantener limpio el código
+function getScaleByLayer(layer) {
+  if (layer === 'far') return random(0.8, 1.2);
+  if (layer === 'mid') return random(1.2, 1.7);
+  if (layer === 'close') return random(1.7, 2.3);
+  return random(2.3, 3.2);
+}
+
+/* ---------------- Dibujar capa de árboles con parallax ---------------- */
+
+function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
+  const yPlayable = yCenter - pixelSize / 2;
+  const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
+  const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
+  
+  noStroke();
+  
+  for (let tree of trees) {
+    // Filtrar por capa
+    if (tree.layer !== layerName) continue;
+    
+    // Efecto parallax - cada capa se mueve a diferente velocidad
+    let x = (tree.x - treeOffset * speedMultiplier) % (width * 2);
+    if (x < -pixelSize * 4) x += width * 2;
+    
+    const s = pixelSize * tree.scale;
+    
+    // Dibujar árbol según su posición vertical asignada
+    if (tree.yPosition === 'top') {
+      drawTree(x, trackTop - s * 2, s, tree.type, opacityMultiplier);
+    } else if (tree.yPosition === 'middle') {
+      // Árbol metido en las vías - centrado en la línea del tren
+      drawTree(x, yPlayable - s * 0.3, s, tree.type, opacityMultiplier);
+    } else {
+      drawTree(x, trackBottom + s * 0.5, s, tree.type, opacityMultiplier);
+    }
+  }
+}
+
+function drawTree(x, y, size, type, opacity) {
+  push();
+  noStroke();
+  
+  if (type === 'detail') {
+    // Estas son las "hierbas pequeñas" que pedías
+    // Usamos colores derivados del césped pero más oscuros
+    fill(40, 70, 40, 255 * opacity); 
+    
+    // Dibujamos un pequeño grupo de píxeles (textura)
+    // size ya es muy pequeño (5-12px), así que lo usamos directamente
+    const detailSize = max(3, size * 8); // Hacemos los detalles más visibles
+    rect(x, y, detailSize, detailSize); 
+    if (size > 5) {
+      rect(x + detailSize, y + detailSize * 0.5, detailSize * 0.6, detailSize * 0.6); // Un píxel extra al lado
+    }
+  } else if (type === 0) {
+    // Árbol tipo 1: Copa circular pequeña y delicada
+    fill(34, 100, 34, 255 * opacity); // Verde oscuro exterior
+    rect(x - size * 0.35, y + size * 0.3, size * 0.7, size * 0.5);
+    rect(x - size * 0.25, y + size * 0.2, size * 0.5, size * 0.1);
+    rect(x - size * 0.25, y + size * 0.8, size * 0.5, size * 0.1);
+    
+    fill(45, 85, 40, 255 * opacity); // Verde oscuro interior - elegante
+    rect(x - size * 0.2, y + size * 0.4, size * 0.4, size * 0.3);
+    
+    // Tronco muy pequeño
+    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
+    rect(x - size * 0.08, y + size * 0.85, size * 0.16, size * 0.2);
+    
+  } else if (type === 1) {
+    // Árbol tipo 2: Pino pequeño y delicado
+    fill(34, 100, 34, 255 * opacity); // Verde oscuro
+    // Forma triangular simple
+    rect(x - size * 0.3, y + size * 0.6, size * 0.6, size * 0.15);
+    rect(x - size * 0.25, y + size * 0.45, size * 0.5, size * 0.15);
+    rect(x - size * 0.2, y + size * 0.3, size * 0.4, size * 0.15);
+    rect(x - size * 0.1, y + size * 0.2, size * 0.2, size * 0.1);
+    
+    // Tronco muy pequeño
+    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
+    rect(x - size * 0.08, y + size * 0.75, size * 0.16, size * 0.25);
+    
+  } else {
+    // Árbol tipo 3: Arbusto pequeño y compacto
+    fill(34, 100, 34, 255 * opacity); // Verde oscuro
+    rect(x - size * 0.3, y + size * 0.35, size * 0.6, size * 0.5);
+    
+    fill(45, 85, 40, 255 * opacity); // Verde oscuro interior - elegante
+    rect(x - size * 0.2, y + size * 0.45, size * 0.4, size * 0.3);
+    
+    // Tronco muy pequeño
+    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
+    rect(x - size * 0.08, y + size * 0.8, size * 0.16, size * 0.2);
+  }
+  
+  pop();
+}
+
+/* ---------------- Árboles como píxeles 1D ---------------- */
+
+function drawTreePixels() {
+  // Los árboles en posición 'middle' dibujan píxeles verdes en la línea 1D
+  for (let tree of trees) {
+    // Solo los árboles que cruzan las vías (middle)
+    if (tree.yPosition !== 'middle') continue;
+    
+    // Calcular posición X con scroll
+    let worldX = tree.x - treeOffset;
+    const loopWidth = width * 2;
+    worldX = ((worldX % loopWidth) + loopWidth) % loopWidth;
+    
+    // Convertir posición X a índice de píxel 1D
+    const pixelIndex = floor(worldX / (width / displaySize));
+    
+    // Dibujar píxel verde si está dentro del rango
+    if (pixelIndex >= 0 && pixelIndex < displaySize) {
+      display.setPixel(pixelIndex, color(46, 139, 50)); // Verde árbol
+    }
+  }
+}
+
+function treeCoversIndex(idx) {
+  // Verificar si hay un árbol en este índice de píxel
+  // TODOS los árboles son obstáculos (no solo 'middle')
+  for (let tree of trees) {
+    let worldX = tree.x - treeOffset;
+    const loopWidth = width * 2;
+    worldX = ((worldX % loopWidth) + loopWidth) % loopWidth;
+    
+    const pixelIndex = floor(worldX / (width / displaySize));
+    
+    if (pixelIndex === idx) return true;
+  }
+  return false;
+}
+
+/* ---------------- Prevenir zoom del navegador ---------------- */
+
+// Prevenir zoom con rueda del ratón + Ctrl/Cmd
+document.addEventListener('wheel', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// Prevenir zoom con atajos de teclado (Ctrl/Cmd + '+', '-', '=', '0')
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && 
+      (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
+    e.preventDefault();
+  }
+}, false);
+
+// Prevenir gesto de pellizcar para zoom en trackpad
+document.addEventListener('gesturestart', function(e) {
+  e.preventDefault();
+}, false);

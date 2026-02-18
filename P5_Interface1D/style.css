@@ -2,6 +2,8 @@
 
 html, body {
     height: 100%;
+    overflow: hidden;
+    touch-action: none; /* Prevenir zoom en dispositivos táctiles */
   }
   
   body {
@@ -14,4 +16,10 @@ html, body {
   
     /* This centers our sketch vertically. */
     align-items: center;
+  }
+  
+  /* Prevenir zoom en el canvas */
+  canvas {
+    touch-action: none;
+    -ms-touch-action: none;
   }

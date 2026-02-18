@@ -197,6 +197,10 @@ class Controller {
 
     applyTunnelHazard(playerOne);
     applyTunnelHazard(playerTwo);
+    
+    // Todos los árboles son obstáculos
+    applyTreeHazard(playerOne);
+    applyTreeHazard(playerTwo);
   }
 }
 
@@ -266,6 +270,28 @@ function applyTunnelHazard(player) {
   }
 
   // On track => must have pressed DOWN recently
+  const framesSinceDown = frameCount - (player.lastDownFrame ?? 999999);
+  if (framesSinceDown > controller.tapWindowFrames) {
+    killPlayerAndConsumeLife(player);
+  }
+}
+
+/* ---------------- Tree hazard (similar to tunnel) ---------------- */
+
+function applyTreeHazard(player) {
+  if (controller.gameState !== "PLAY") return;
+  if (player.isDead) return;
+
+  // Verificar si el jugador está en un píxel con árbol
+  if (!treeCoversIndex(player.position)) return;
+
+  // Si está en un vagón (WAGON), pierde vida
+  if (player.mode === "WAGON") {
+    killPlayerAndConsumeLife(player);
+    return;
+  }
+
+  // Si está en la vía (TRACK), debe estar presionando DOWN para sobrevivir
   const framesSinceDown = frameCount - (player.lastDownFrame ?? 999999);
   if (framesSinceDown > controller.tapWindowFrames) {
     killPlayerAndConsumeLife(player);
