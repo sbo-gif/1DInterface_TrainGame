@@ -75,10 +75,10 @@ function draw() {
   const yCenter = height * 0.5;
   const yPlayable = yCenter - pixelSize / 2;
 
-  // Dibujar árboles en MÚLTIPLES CAPAS con parallax
-  drawTreeLayer(yCenter, 'far', 0.3, 0.6);        // Capa lejana - 30% velocidad, 60% opacidad
-  drawTreeLayer(yCenter, 'mid', 0.6, 0.75);       // Capa media - 60% velocidad, 75% opacidad
-  drawTreeLayer(yCenter, 'close', 0.85, 0.9);     // Capa cerca - 85% velocidad, 90% opacidad
+  // Dibujar árboles en MÚLTIPLES CAPAS - TODAS a la misma velocidad que las vías
+  drawTreeLayer(yCenter, 'far', 1.0, 0.6);        // Capa lejana - 100% velocidad (igual que vías)
+  drawTreeLayer(yCenter, 'mid', 1.0, 0.75);       // Capa media - 100% velocidad (igual que vías)
+  drawTreeLayer(yCenter, 'close', 1.0, 0.9);      // Capa cerca - 100% velocidad (igual que vías)
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
@@ -278,32 +278,53 @@ function drawFatCenterTrackBand(yCenter, offsetPx) {
 
 function initializeTrees() {
   trees = [];
-  const numElements = 60; // Aumentamos para tener más detalle de fondo
-  
-  for (let i = 0; i < numElements; i++) {
-    let layerRand = random();
-    let layer = layerRand < 0.25 ? 'far' : layerRand < 0.5 ? 'mid' : layerRand < 0.75 ? 'close' : 'foreground';
+  // Crear árboles en MÚLTIPLES CAPAS de profundidad
+  const numTrees = 40; // Más árboles para llenar las capas
+  for (let i = 0; i < numTrees; i++) {
+    // Posición vertical: top, middle (metido en las vías), o bottom
+    let yPos;
+    const rand = random();
+    if (rand < 0.4) {
+      yPos = 'top';
+    } else if (rand < 0.7) {
+      yPos = 'middle';
+    } else {
+      yPos = 'bottom';
+    }
     
-    // Determinamos si es un árbol real o solo "hierba/detalle"
-    let isDetail = random() > 0.6; 
-
+    // Asignar capa de profundidad: far, mid, close, foreground
+    let layer;
+    let layerRand = random();
+    if (layerRand < 0.25) {
+      layer = 'far';      // Más lejos - más pequeño
+    } else if (layerRand < 0.5) {
+      layer = 'mid';      // Medio
+    } else if (layerRand < 0.75) {
+      layer = 'close';    // Cerca
+    } else {
+      layer = 'foreground'; // Primer plano - más grande
+    }
+    
+    // Escala según la capa
+    let scale;
+    if (layer === 'far') {
+      scale = random(0.5, 0.9);  // Muy pequeños (fondo)
+    } else if (layer === 'mid') {
+      scale = random(0.9, 1.4);  // Medianos
+    } else if (layer === 'close') {
+      scale = random(1.4, 2.0);  // Grandes
+    } else {
+      scale = random(2.0, 3.0);  // Muy grandes (primer plano)
+    }
+    
     trees.push({
       x: random(width * 2),
-      type: isDetail ? 'detail' : floor(random(3)), // Nuevo tipo 'detail'
-      scale: isDetail ? random(0.2, 0.5) : getScaleByLayer(layer),
+      type: floor(random(3)),
+      scale: scale,
       layer: layer,
-      yPosition: random(['top', 'middle', 'bottom']),
-      detailVariant: floor(random(3)) // Para que no todos los puntitos sean iguales
+      yPosition: yPos
     });
   }
-}
-
-// Función auxiliar para mantener limpio el código
-function getScaleByLayer(layer) {
-  if (layer === 'far') return random(0.8, 1.2);
-  if (layer === 'mid') return random(1.2, 1.7);
-  if (layer === 'close') return random(1.7, 2.3);
-  return random(2.3, 3.2);
 }
 
 /* ---------------- Dibujar capa de árboles con parallax ---------------- */
@@ -341,19 +362,8 @@ function drawTree(x, y, size, type, opacity) {
   push();
   noStroke();
   
-  if (type === 'detail') {
-    // Estas son las "hierbas pequeñas" que pedías
-    // Usamos colores derivados del césped pero más oscuros
-    fill(40, 70, 40, 255 * opacity); 
-    
-    // Dibujamos un pequeño grupo de píxeles (textura)
-    // size ya es muy pequeño (5-12px), así que lo usamos directamente
-    const detailSize = max(3, size * 8); // Hacemos los detalles más visibles
-    rect(x, y, detailSize, detailSize); 
-    if (size > 5) {
-      rect(x + detailSize, y + detailSize * 0.5, detailSize * 0.6, detailSize * 0.6); // Un píxel extra al lado
-    }
-  } else if (type === 0) {
+  // Árboles delicados y minimalistas - diseño elegante para 
+  if (type === 0) {
     // Árbol tipo 1: Copa circular pequeña y delicada
     fill(34, 100, 34, 255 * opacity); // Verde oscuro exterior
     rect(x - size * 0.35, y + size * 0.3, size * 0.7, size * 0.5);

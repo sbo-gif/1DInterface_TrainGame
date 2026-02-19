@@ -1,92 +1,49 @@
-/*
+#include <Keyboard.h>
 
-This is a simple example that allows you to connect 4 buttons and a rotary encoder to your Arduino.
-The Arduino acts as a keyboard by outputting button presses.
+// Configuración basada en tu conexión física
+const int pinX = A1; // Cable Verde
+const int pinY = A0; // Cable Amarillo
+const int pinSW = 7; // Cable Morado
 
-You will need this table to figure the code for the characters you are trying to output.
-http://www.asciitable.com/
+// Zona muerta: Ignora valores entre 450 y 570 para evitar deriva (drift)
+const int CENTRO = 512;
+const int TOLERANCIA = 80; 
 
-*/
-
-#include <Keyboard.h>      // include library that let's Arduino act as a keyboard
-
-
-// some useful values
-#define OFF 0
-#define ON 1
-
-// Direction buttons (wired as INPUT_PULLUP: pressed = LOW, released = HIGH)
-const int UP_PIN    = 14; // W
-const int DOWN_PIN  = 8;  // S
-const int LEFT_PIN  = 7;  // A
-const int RIGHT_PIN = 16; // D
-
-bool upLatched    = OFF;
-bool downLatched  = OFF;
-bool leftLatched  = OFF;
-bool rightLatched = OFF;
-
-
-
-void setup()
-{
-
-  // connect to serial port for debugging
-  Serial.begin(57600);
-
-  pinMode(UP_PIN, INPUT_PULLUP);
-  pinMode(DOWN_PIN, INPUT_PULLUP);
-  pinMode(LEFT_PIN, INPUT_PULLUP);
-  pinMode(RIGHT_PIN, INPUT_PULLUP);
-
-  // start the keyboard
-  Keyboard.begin();
+void setup() {
+  Keyboard.begin(); //
+  pinMode(pinSW, INPUT_PULLUP); // Activa resistencia interna para el botón
 }
 
-void loop()
-{
+void loop() {
+  int valorX = analogRead(pinX); //
+  int valorY = analogRead(pinY); //
 
-
-  // All the key presses happen here (pressed = LOW with INPUT_PULLUP)
-  //////////////////////////////////////////////////////////////
-
-  // UP -> W
-  if (digitalRead(UP_PIN) == LOW && upLatched == OFF) {
-    upLatched = ON;
-    Keyboard.write('W');   // or 'w' if your game checks lowercase
-  }
-  if (digitalRead(UP_PIN) == HIGH) {
-    upLatched = OFF;
+  // --- LÓGICA EJE Y (W / S) ---
+  if (valorY < (CENTRO - TOLERANCIA)) {
+    Keyboard.press('w'); //
+  } else if (valorY > (CENTRO + TOLERANCIA)) {
+    Keyboard.press('s'); //
+  } else {
+    Keyboard.release('w'); //
+    Keyboard.release('s'); //
   }
 
-  // DOWN -> S
-  if (digitalRead(DOWN_PIN) == LOW && downLatched == OFF) {
-    downLatched = ON;
-    Keyboard.write('S');
-  }
-  if (digitalRead(DOWN_PIN) == HIGH) {
-    downLatched = OFF;
-  }
-
-  // LEFT -> A
-  if (digitalRead(LEFT_PIN) == LOW && leftLatched == OFF) {
-    leftLatched = ON;
-    Keyboard.write('A');
-  }
-  if (digitalRead(LEFT_PIN) == HIGH) {
-    leftLatched = OFF;
+  // --- LÓGICA EJE X (A / D) ---
+  if (valorX < (CENTRO - TOLERANCIA)) {
+    Keyboard.press('a'); //
+  } else if (valorX > (CENTRO + TOLERANCIA)) {
+    Keyboard.press('d'); //
+  } else {
+    Keyboard.release('a'); //
+    Keyboard.release('d'); //
   }
 
-  // RIGHT -> D
-  if (digitalRead(RIGHT_PIN) == LOW && rightLatched == OFF) {
-    rightLatched = ON;
-    Keyboard.write('D');
-  }
-  if (digitalRead(RIGHT_PIN) == HIGH) {
-    rightLatched = OFF;
+  // --- LÓGICA BOTÓN (ESPACIO) ---
+  if (digitalRead(pinSW) == LOW) { //
+    Keyboard.press(' '); //
+  } else {
+    Keyboard.release(' '); //
   }
 
-  delay(5); // tiny debounce helper
-
-  
+  delay(15); //
 }
