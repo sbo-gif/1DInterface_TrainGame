@@ -16,7 +16,7 @@ void setup() {
 
 void loop() {
   int valorX = analogRead(pinX); //
-  int valorY = analogRead(pinY); //
+  int valorY = analogReadaw(pinY); //
 
   // --- LÓGICA EJE Y (W / S) ---
   if (valorY < (CENTRO - TOLERANCIA)) {

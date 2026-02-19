@@ -5,7 +5,7 @@ let JUMP_TOP_SECONDS = 1.0;
 
 let TRACK_TAP_WINDOW = 0.5;   // must press DOWN at least this often
 let TRACK_DEATH_AFTER = 5.0;  // die after this long without DOWN
-let RESPAWN_AFTER = 5.0;      // respawn delay
+let RESPAWN_AFTER = 1.0;      // respawn delay (reducido de 5 a 1 segundo)
 
 // Blink behavior (frames)
 let BLINK_PERIOD_NORMAL = 20;
@@ -23,7 +23,7 @@ let TUNNEL_WARNING_SECONDS = 2.0;
 let TUNNEL_WIDTH_PIXELS = 5;
 
 // Tunnel speed (columns per second), moving RIGHT -> LEFT
-let TUNNEL_SPEED_COLS_PER_SEC = 8.0;
+let TUNNEL_SPEED_COLS_PER_SEC = 4.0; // Reducido a la mitad (antes era 8.0)
 
 class Controller {
   constructor() {
@@ -113,8 +113,14 @@ class Controller {
     return candidates[floor(random(0, candidates.length))];
   }
 
-  spawnPlayerOnWagon(player, avoidIndex = null) {
-    player.position = this.randomWagonIndex(avoidIndex);
+  spawnPlayerOnWagon(player, avoidIndex = null, specificPosition = null) {
+    // Si se especifica una posición, usarla; si no, elegir aleatoria
+    if (specificPosition !== null && controller.wagonMask[specificPosition]) {
+      player.position = specificPosition;
+    } else {
+      player.position = this.randomWagonIndex(avoidIndex);
+    }
+    
     player.mode = "WAGON";
 
     player.isAirborne = false;
@@ -124,6 +130,11 @@ class Controller {
     player.deadFramesLeft = 0;
 
     player.lastDownFrame = frameCount;
+    
+    // Dar inmunidad temporal al jugador (3 segundos para dar tiempo)
+    player.invulnerableUntil = frameCount + 180; // 180 frames = 3 segundos a 60fps
+    
+    console.log("Player spawned at position", player.position, "with invulnerability until frame", player.invulnerableUntil);
   }
 
   isTunnelWarning() {
@@ -188,6 +199,9 @@ class Controller {
 
     // Gameplay only in PLAY
     this.updateTunnel();
+    
+    // Check continuous key presses for joystick support
+    checkContinuousKeys();
 
     tickJumpTimer(playerOne);
     tickJumpTimer(playerTwo);
@@ -218,6 +232,12 @@ function tickJumpTimer(player) {
 
 function killPlayerAndConsumeLife(player) {
   if (player.isDead) return;
+  
+  const playerName = (player === playerOne) ? "Player 1 (Red)" : "Player 2 (Blue)";
+  console.log(`💀 ${playerName} DIED at frame ${frameCount}, position ${player.position}, mode ${player.mode}`);
+  
+  // Guardar la posición donde murió
+  player.deathPosition = player.position;
 
   player.lives = max(0, player.lives - 1);
 
@@ -239,8 +259,8 @@ function tickTrackSurvival(player) {
     player.deadFramesLeft--;
     if (player.deadFramesLeft <= 0) {
       if (player.lives > 0) {
-        const avoid = (player === playerOne) ? playerTwo.position : playerOne.position;
-        controller.spawnPlayerOnWagon(player, avoid);
+        // Respawnear en la posición donde murió si es posible
+        controller.spawnPlayerOnWagon(player, null, player.deathPosition);
       }
     }
     return;
@@ -260,20 +280,23 @@ function applyTunnelHazard(player) {
   if (controller.gameState !== "PLAY") return;
   if (!controller.tunnelActive) return;
   if (player.isDead) return;
+  
+  // Check invulnerability
+  if (frameCount < player.invulnerableUntil) return;
 
   if (!controller.tunnelCoversIndex(player.position)) return;
 
-  // On wagon => die (even if airborne/invisible)
+  // LÓGICA DEL TÚNEL:
+  // - Si estás en un VAGÓN → MUERES (el túnel te golpea)
+  // - Si estás en TRACK (vías/gap) → SOBREVIVES (estás agachado, el túnel pasa por encima)
+  
   if (player.mode === "WAGON") {
     killPlayerAndConsumeLife(player);
     return;
   }
-
-  // On track => must have pressed DOWN recently
-  const framesSinceDown = frameCount - (player.lastDownFrame ?? 999999);
-  if (framesSinceDown > controller.tapWindowFrames) {
-    killPlayerAndConsumeLife(player);
-  }
+  
+  // Si estás en TRACK (incluyendo gaps), sobrevives automáticamente
+  // NO necesitas presionar DOWN porque ya estás agachado por estar en las vías
 }
 
 /* ---------------- Tree hazard (similar to tunnel) ---------------- */
@@ -281,9 +304,15 @@ function applyTunnelHazard(player) {
 function applyTreeHazard(player) {
   if (controller.gameState !== "PLAY") return;
   if (player.isDead) return;
+  
+  // Check invulnerability
+  if (frameCount < player.invulnerableUntil) return;
 
   // Verificar si el jugador está en un píxel con árbol
   if (!treeCoversIndex(player.position)) return;
+  
+  const playerName = (player === playerOne) ? "Player 1" : "Player 2";
+  console.log(`🌲 ${playerName} hit by tree at position ${player.position}`);
 
   // Si está en un vagón (WAGON), pierde vida
   if (player.mode === "WAGON") {
@@ -385,6 +414,73 @@ function tryJump(player) {
 }
 
 /* ---------------- Keyboard Controls ---------------- */
+
+// Track which keys were pressed in previous frame (to detect new presses)
+let prevKeysDown = {
+  a: false, d: false, s: false, w: false,
+  j: false, l: false, k: false, i: false
+};
+
+// Check continuous key presses (for joystick support)
+function checkContinuousKeys() {
+  if (controller.gameState !== "PLAY") return;
+  
+  // Player 1 - Movement (A/D) needs to be triggered once per press
+  if (keyIsDown(65)) { // A
+    if (!prevKeysDown.a) tryMoveSide(playerOne, -1);
+    prevKeysDown.a = true;
+  } else {
+    prevKeysDown.a = false;
+  }
+  
+  if (keyIsDown(68)) { // D
+    if (!prevKeysDown.d) tryMoveSide(playerOne, 1);
+    prevKeysDown.d = true;
+  } else {
+    prevKeysDown.d = false;
+  }
+  
+  // S needs to be called every frame while held (for survival)
+  if (keyIsDown(83)) { // S
+    handleDownPress(playerOne);
+  }
+  
+  // W needs to be triggered once per press
+  if (keyIsDown(87)) { // W
+    if (!prevKeysDown.w) tryJump(playerOne);
+    prevKeysDown.w = true;
+  } else {
+    prevKeysDown.w = false;
+  }
+  
+  // Player 2 - Movement (J/L) needs to be triggered once per press
+  if (keyIsDown(74)) { // J
+    if (!prevKeysDown.j) tryMoveSide(playerTwo, -1);
+    prevKeysDown.j = true;
+  } else {
+    prevKeysDown.j = false;
+  }
+  
+  if (keyIsDown(76)) { // L
+    if (!prevKeysDown.l) tryMoveSide(playerTwo, 1);
+    prevKeysDown.l = true;
+  } else {
+    prevKeysDown.l = false;
+  }
+  
+  // K needs to be called every frame while held (for survival)
+  if (keyIsDown(75)) { // K
+    handleDownPress(playerTwo);
+  }
+  
+  // I needs to be triggered once per press
+  if (keyIsDown(73)) { // I
+    if (!prevKeysDown.i) tryJump(playerTwo);
+    prevKeysDown.i = true;
+  } else {
+    prevKeysDown.i = false;
+  }
+}
 
 function keyPressed() {
   // SPACE starts game

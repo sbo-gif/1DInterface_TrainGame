@@ -11,7 +11,7 @@ let controller;
 
 // Track animation (runs even on START screen)
 let sleeperOffset = 0;
-let sleeperSpeed = 3;
+let sleeperSpeed = 1.5; // Reducido a la mitad (antes era 3)
 
 // Toggles
 let showCenterTrack = true;
@@ -75,10 +75,8 @@ function draw() {
   const yCenter = height * 0.5;
   const yPlayable = yCenter - pixelSize / 2;
 
-  // Dibujar árboles en MÚLTIPLES CAPAS - TODAS a la misma velocidad que las vías
-  drawTreeLayer(yCenter, 'far', 1.0, 0.6);        // Capa lejana - 100% velocidad (igual que vías)
-  drawTreeLayer(yCenter, 'mid', 1.0, 0.75);       // Capa media - 100% velocidad (igual que vías)
-  drawTreeLayer(yCenter, 'close', 1.0, 0.9);      // Capa cerca - 100% velocidad (igual que vías)
+  // NO dibujar árboles de fondo que quedan tapados por las vías
+  // Solo dibujamos los árboles de primer plano (después de las vías) que cubren el tren
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
@@ -98,6 +96,14 @@ function draw() {
     if (controller.isTunnelWarning()) drawWarningText();
 
     drawLivesUI();
+    
+    // Mostrar mensaje de respawn
+    if (playerOne.isDead && playerOne.lives > 0) {
+      drawRespawnMessage(playerOne, "Player 1");
+    }
+    if (playerTwo.isDead && playerTwo.lives > 0) {
+      drawRespawnMessage(playerTwo, "Player 2");
+    }
   }
 
   // Dibujar árboles grandes DESPUÉS del tren (primer plano) - cubren las vías
@@ -162,8 +168,41 @@ function drawStartScreenOverlay() {
 
 /* ---------------- Player icon ---------------- */
 
+function drawRespawnMessage(player, playerName) {
+  const secondsLeft = (player.deadFramesLeft / 60).toFixed(1);
+  
+  fill(player.playerColor);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(pixelSize * 0.5);
+  
+  const yPos = playerName === "Player 1" ? pixelSize * 1.5 : pixelSize * 2.2;
+  text(`${playerName} respawning in ${secondsLeft}s`, width / 2, yPos);
+}
+
 function drawPlayerIcon(player, yPlayable) {
+  // Debug info
+  if (frameCount % 60 === 0) {
+    const playerName = (player === playerOne) ? "Player 1 (Red)" : "Player 2 (Blue)";
+    console.log(playerName, {
+      position: player.position,
+      mode: player.mode,
+      isDead: player.isDead,
+      deadFramesLeft: player.deadFramesLeft,
+      isAirborne: player.isAirborne,
+      lives: player.lives,
+      invulnerable: frameCount < player.invulnerableUntil,
+      gameState: controller.gameState
+    });
+  }
+  
   if (player.isDead || player.isAirborne) return;
+  
+  // Parpadeo durante invulnerabilidad
+  if (frameCount < player.invulnerableUntil) {
+    const blinkOn = (frameCount % 10) < 5; // Parpadeo rápido
+    if (!blinkOn) return;
+  }
 
   // Track survival blinking speeds up toward death
   if (player.mode === "TRACK") {
@@ -278,15 +317,32 @@ function drawFatCenterTrackBand(yCenter, offsetPx) {
 
 function initializeTrees() {
   trees = [];
-  // Crear árboles en MÚLTIPLES CAPAS de profundidad
-  const numTrees = 40; // Más árboles para llenar las capas
-  for (let i = 0; i < numTrees; i++) {
-    // Posición vertical: top, middle (metido en las vías), o bottom
+  
+  // PRIMERO: Crear algunos árboles ESPECÍFICAMENTE sobre las vías (middle)
+  const numMiddleTrees = 4; // Árboles garantizados sobre las vías
+  for (let i = 0; i < numMiddleTrees; i++) {
+    // Estos árboles SIEMPRE estarán en posición 'middle' (sobre las vías)
+    let layer = (i % 2 === 0) ? 'foreground' : 'close'; // Alternar entre primer plano y cerca
+    let scale = (layer === 'foreground') ? random(2.0, 3.0) : random(1.4, 2.0);
+    
+    trees.push({
+      x: random(width * 2),
+      type: floor(random(3)),
+      scale: scale,
+      layer: layer,
+      yPosition: 'middle' // SIEMPRE sobre las vías
+    });
+  }
+  
+  // SEGUNDO: Crear árboles adicionales en posiciones aleatorias
+  const numRandomTrees = 4; // Árboles en posiciones aleatorias
+  for (let i = 0; i < numRandomTrees; i++) {
+    // Posición vertical: top, middle, o bottom (aleatorio)
     let yPos;
     const rand = random();
-    if (rand < 0.4) {
+    if (rand < 0.3) {
       yPos = 'top';
-    } else if (rand < 0.7) {
+    } else if (rand < 0.6) {
       yPos = 'middle';
     } else {
       yPos = 'bottom';
