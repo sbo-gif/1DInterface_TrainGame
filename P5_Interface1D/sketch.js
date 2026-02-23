@@ -20,6 +20,9 @@ let sleeperSpeed = 1.5; // Reducido a la mitad (antes era 3)
 let showCenterTrack = true;
 let playerIconShape = "square"; // "square" or "circle"
 
+// Bridge shadow: percent of screen (centered) where shadow is invisible
+let SHADOW_INVISIBLE_PERCENT = 10; // e.g. 10 => invisible in center ±5%
+
 // Track colors
 let TRACK_COLORS = {
   rail: null,
@@ -102,7 +105,7 @@ function draw() {
      // Dibujar árboles grandes DESPUÉS del tren (primer plano) - cubren las vías
     drawTreeLayer(yCenter, 'foreground', 1.0, 1.0); // Primer plano - 100% velocidad, opacidad total
 
-    if (controller.tunnelActive) drawTunnelOverlay();
+    if (controller.tunnelActive) drawTunnelOverlay(yCenter);
     if (controller.isTunnelWarning()) drawWarningText();
 
     drawLivesUI();
@@ -244,14 +247,165 @@ function drawPlayerIcon(player, yPlayable) {
 }
 
 /* ---------------- Tunnel overlay + warning ---------------- */
+/* ---------------- Tunnel overlay + warning ---------------- */
 
-function drawTunnelOverlay() {
+function drawTunnelOverlay(yCenter) {
   const x = controller.tunnelX * pixelSize;
   const w = TUNNEL_WIDTH_PIXELS * pixelSize;
 
+  // Track band references (so pillars avoid the playable area)
+  const yPlayable = yCenter - pixelSize / 2;
+  const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
+  const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
+
+  // Highway proportions
+  const shoulderW = max(6, floor(w * 0.1)); // red/white curb width
+  const roadX = x + shoulderW;
+  const roadW = w - 2 * shoulderW;
+
+  // --- VISIBILITY based on how off-center the bridge is ---
+  const cx = x + w / 2;
+  const distFromCenter = abs(cx - width / 2);
+
+  // Pillars only near edges
+  const start = width * 0.28;
+  const end = width * 0.46;
+  let pillarAlpha = (distFromCenter - start) / (end - start);
+  pillarAlpha = constrain(pillarAlpha, 0, 1);
+
+  // Inner side faces screen center
+  const showInnerRightEdge = (cx < width / 2);
+
+  // Shadow band (inner side)
+  const shadowW = pixelSize * 1.2;
+  const shadowX = showInnerRightEdge ? (x + w) : (x - shadowW);
+
+  // clamp shadow so it doesn’t draw off-canvas
+  const sx = constrain(shadowX, 0, width);
+  const sw = constrain(shadowW, 0, width - sx);
+
+  // --- shadow visibility toggle around center ---
+  const invisibleHalfW = width * (SHADOW_INVISIBLE_PERCENT / 100) * 0.5;
+
+  let shadowAlpha = pillarAlpha;
+  if (distFromCenter < invisibleHalfW) {
+    shadowAlpha = 0;
+  } else {
+    const start2 = invisibleHalfW;
+    const end2 = width * 0.46;
+    shadowAlpha = (distFromCenter - start2) / (end2 - start2);
+    shadowAlpha = constrain(shadowAlpha, 0, 1);
+  }
+
+  // ✅ DRAW shadow (you were missing this)
+  if (shadowAlpha > 0.001 && sw > 0.5) {
+    noStroke();
+    fill(60, 90, 60, 140 * shadowAlpha); // dark green w/ alpha
+    rect(sx, 0, sw, height);
+  }
+
+  // 1) Road deck (grey asphalt)
   noStroke();
-  fill(0);
-  rect(x, 0, w, height);
+  fill(130);
+  rect(roadX, 0, roadW, height);
+
+  // 2) Subtle inner edges (guardrail)
+  fill(90);
+  const railW = max(2, floor(roadW * 0.04));
+  rect(roadX, 0, railW, height);
+  rect(roadX + roadW - railW, 0, railW, height);
+
+  // 3) Shoulders base red
+  fill(200, 40, 40);
+  rect(x, 0, shoulderW, height);
+  rect(x + w - shoulderW, 0, shoulderW, height);
+
+  // 4) Alternating white blocks on shoulders
+  const blockH = pixelSize * 1.4;
+  const gapH = pixelSize * 0.4;
+  const stride = blockH + gapH;
+
+  for (let yy = 0; yy < height + stride; yy += stride) {
+    fill(245);
+    rect(x, yy + blockH * 0.35, shoulderW, blockH * 0.55);
+    rect(x + w - shoulderW, yy + blockH * 0.35, shoulderW, blockH * 0.55);
+  }
+
+  // 5) Dashed center line
+  const dashW = max(2, floor(roadW * 0.12));
+  const dashX = roadX + roadW / 2 - dashW / 2;
+  const dashH = pixelSize * 1.2;
+  const dashGap = pixelSize * 0.8;
+
+  fill(245);
+  for (let yy = 0; yy < height + dashH; yy += dashH + dashGap) {
+    rect(dashX, yy, dashW, dashH);
+  }
+
+  // Optional: tiny highlight at the top to make the deck feel "raised"
+  fill(255, 18);
+  rect(roadX, 0, roadW, pixelSize * 0.35);
+
+  // ✅ Pillars as HORIZONTAL brackets:
+  // long when near edge (shadowAlpha ~ 1), short as approaching center (shadowAlpha -> 0)
+  if (shadowAlpha > 0.001) {
+    const dir = showInnerRightEdge ? 1 : -1;
+
+    // Base anchor at the inner edge of the road deck (right next to the shadow band)
+    const edgeX = showInnerRightEdge ? (x + w) : x;
+
+    // Horizontal length of bracket in pixels:
+    // - long at edge, shrinks toward center
+    const maxLen = pixelSize * 2.0;         // adjust if you want longer
+    const minLen = pixelSize * 0.8;         // small nub before disappearing
+    const bracketLen = lerp(minLen, maxLen, shadowAlpha);
+
+    // Vertical thickness of bracket
+    const bracketH = pixelSize * 0.55;
+
+    // ✅ Keep pillars out of the playable corridor with a clearance (same strategy as background trees)
+    const pillarClearance = pixelSize * 3.5;
+
+    // For TOP brackets: y is the top of the rect, so subtract bracketH to keep the whole bracket above (trackTop - clearance)
+    const baseTopY = (trackTop - pillarClearance) - bracketH;
+
+    // For BOTTOM brackets: y is the top of the rect, so start below (trackBottom + clearance)
+    const baseBotY = (trackBottom + pillarClearance);
+
+    // Keep the stack tighter so it never creeps into the corridor
+    const offsets = [-pixelSize * 2.0, 0, pixelSize * 2.0];
+
+    for (const dy of offsets) {
+      // Top bracket
+      drawBridgePillar(edgeX, baseTopY + dy, bracketLen, bracketH, shadowAlpha, showInnerRightEdge);
+
+      // Bottom bracket
+      drawBridgePillar(edgeX, baseBotY + dy, bracketLen, bracketH, shadowAlpha, showInnerRightEdge);
+    }
+  }
+}
+
+function drawBridgePillar(edgeX, y, lenX, thickY, alpha01, innerRightEdge) {
+  // Draw a horizontal bracket extending from the inner road edge into the shadow band
+  const dir = innerRightEdge ? 1 : -1;
+
+  // If inner side is right, bracket starts at road edge and extends right.
+  // If inner side is left, bracket ends at road edge and extends left.
+  const px = innerRightEdge ? edgeX : (edgeX - lenX);
+
+  noStroke();
+
+  // subtle drop shadow under the bracket
+  fill(0, 35 * alpha01);
+  rect(px + dir * (pixelSize * 0.15), y + thickY * 0.55, lenX, thickY * 0.55, 2);
+
+  // main bracket (light concrete)
+  fill(210, 210, 210, 255 * alpha01);
+  rect(px, y, lenX, thickY, 2);
+
+  // underside shade for quick 3D cue
+  fill(170, 170, 170, 255 * alpha01);
+  rect(px, y + thickY * 0.55, lenX, thickY * 0.45, 2);
 }
 
 function drawWarningText() {
@@ -406,7 +560,7 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
   const yPlayable = yCenter - pixelSize / 2;
   const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
   const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
-  const clearance = pixelSize * 1.5; // ✅ keeps trees away from track
+  const clearance = pixelSize * 1.5; //  keeps trees away from track
 
   noStroke();
   
