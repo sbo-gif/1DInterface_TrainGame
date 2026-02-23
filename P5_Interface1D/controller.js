@@ -18,7 +18,7 @@ let STARTING_LIVES = 3;
 let ASSUMED_FPS = 60;
 
 // ===== TUNNEL TOGGLES =====
-let TIME_UNTIL_TUNNEL = 10.0;
+let TIME_UNTIL_TUNNEL = 1.0;
 let TUNNEL_WARNING_SECONDS = 2.0;
 let TUNNEL_WIDTH_PIXELS = 5;
 
@@ -65,12 +65,16 @@ class Controller {
     this.gameState = "PLAY";
 
     playerOne.lives = STARTING_LIVES;
-    playerTwo.lives = STARTING_LIVES;
+    if (player2Enabled) {
+      playerTwo.lives = STARTING_LIVES;
+    }   
 
     this.computeTrainLayout();
     this.spawnPlayerOnWagon(playerOne);
-    this.spawnPlayerOnWagon(playerTwo, playerOne.position);
 
+    if (player2Enabled) {
+      this.spawnPlayerOnWagon(playerTwo, playerOne.position);
+    }  
     // Schedule tunnel from now
     this.tunnelDone = false;
     this.tunnelActive = false;
@@ -204,17 +208,21 @@ class Controller {
     checkContinuousKeys();
 
     tickJumpTimer(playerOne);
-    tickJumpTimer(playerTwo);
 
     tickTrackSurvival(playerOne);
-    tickTrackSurvival(playerTwo);
 
     applyTunnelHazard(playerOne);
-    applyTunnelHazard(playerTwo);
     
     // Todos los árboles son obstáculos
     applyTreeHazard(playerOne);
-    applyTreeHazard(playerTwo);
+
+    if (player2Enabled) {
+      tickJumpTimer(playerTwo);
+      tickTrackSurvival(playerTwo);
+      applyTunnelHazard(playerTwo);
+      applyTreeHazard(playerTwo);
+
+    }
   }
 }
 
@@ -305,6 +313,9 @@ function applyTreeHazard(player) {
   if (controller.gameState !== "PLAY") return;
   if (player.isDead) return;
   
+  // if you're jumping, you should not collide with trees
+  if (player.isAirborne) return;
+
   // Check invulnerability
   if (frameCount < player.invulnerableUntil) return;
 
@@ -505,8 +516,11 @@ function keyPressed() {
   if (key === 'W' || key === 'w') tryJump(playerOne);
 
   // Player 2
-  if (key === 'J' || key === 'j') tryMoveSide(playerTwo, -1);
-  if (key === 'L' || key === 'l') tryMoveSide(playerTwo, 1);
-  if (key === 'K' || key === 'k') handleDownPress(playerTwo);
-  if (key === 'I' || key === 'i') tryJump(playerTwo);
+  if (player2Enabled) {
+    if (key === 'J' || key === 'j') tryMoveSide(playerTwo, -1);
+    if (key === 'L' || key === 'l') tryMoveSide(playerTwo, 1);
+    if (key === 'K' || key === 'k') handleDownPress(playerTwo);
+    if (key === 'I' || key === 'i') tryJump(playerTwo);  
+  }
+  
 }

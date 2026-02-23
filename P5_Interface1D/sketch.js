@@ -9,6 +9,9 @@ let playerTwo;
 let display;
 let controller;
 
+// Choose to be a 1- or 2-player game
+let player2Enabled = false;  // 🔁 CHANGE TO false for 1-player mode
+
 // Track animation (runs even on START screen)
 let sleeperOffset = 0;
 let sleeperSpeed = 1.5; // Reducido a la mitad (antes era 3)
@@ -75,8 +78,10 @@ function draw() {
   const yCenter = height * 0.5;
   const yPlayable = yCenter - pixelSize / 2;
 
-  // NO dibujar árboles de fondo que quedan tapados por las vías
-  // Solo dibujamos los árboles de primer plano (después de las vías) que cubren el tren
+  // Background trees (visual only)
+  drawTreeLayer(yCenter, 'far', 0.25, 0.25);
+  drawTreeLayer(yCenter, 'mid', 0.45, 0.45);
+  drawTreeLayer(yCenter, 'close', 0.70, 0.70);
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
@@ -90,7 +95,12 @@ function draw() {
 
   if (controller.gameState === "PLAY") {
     drawPlayerIcon(playerOne, yPlayable);
-    drawPlayerIcon(playerTwo, yPlayable);
+    if (player2Enabled){
+      drawPlayerIcon(playerTwo, yPlayable);
+    }
+
+     // Dibujar árboles grandes DESPUÉS del tren (primer plano) - cubren las vías
+    drawTreeLayer(yCenter, 'foreground', 1.0, 1.0); // Primer plano - 100% velocidad, opacidad total
 
     if (controller.tunnelActive) drawTunnelOverlay();
     if (controller.isTunnelWarning()) drawWarningText();
@@ -106,8 +116,7 @@ function draw() {
     }
   }
 
-  // Dibujar árboles grandes DESPUÉS del tren (primer plano) - cubren las vías
-  drawTreeLayer(yCenter, 'foreground', 1.0, 1.0); // Primer plano - 100% velocidad, opacidad total
+ 
 
   if (controller.gameState === "START") {
     drawStartScreenOverlay();
@@ -263,7 +272,9 @@ function drawLivesUI() {
   drawLifeRow(pad, pad, playerOne.playerColor, playerOne.lives);
 
   const totalWidth = STARTING_LIVES * box + (STARTING_LIVES - 1) * gap;
-  drawLifeRow(width - pad - totalWidth, pad, playerTwo.playerColor, playerTwo.lives);
+  if (player2Enabled) {
+    drawLifeRow(width - pad - totalWidth, pad, playerTwo.playerColor, playerTwo.lives);
+  }
 }
 
 function drawLifeRow(x, y, c, livesLeft) {
@@ -322,7 +333,7 @@ function initializeTrees() {
   const numMiddleTrees = 4; // Árboles garantizados sobre las vías
   for (let i = 0; i < numMiddleTrees; i++) {
     // Estos árboles SIEMPRE estarán en posición 'middle' (sobre las vías)
-    let layer = (i % 2 === 0) ? 'foreground' : 'close'; // Alternar entre primer plano y cerca
+    let layer = 'foreground'; 
     let scale = (layer === 'foreground') ? random(2.0, 3.0) : random(1.4, 2.0);
     
     trees.push({
@@ -372,6 +383,12 @@ function initializeTrees() {
     } else {
       scale = random(2.0, 3.0);  // Muy grandes (primer plano)
     }
+
+    // prevent background trees from appearing on the track corridor
+    if (layer !== 'foreground' && yPos === 'middle') {
+      yPos = (random() < 0.5) ? 'top' : 'bottom';
+    }
+
     
     trees.push({
       x: random(width * 2),
@@ -389,12 +406,15 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
   const yPlayable = yCenter - pixelSize / 2;
   const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
   const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
-  
+  const clearance = pixelSize * 1.5; // ✅ keeps trees away from track
+
   noStroke();
   
   for (let tree of trees) {
     // Filtrar por capa
     if (tree.layer !== layerName) continue;
+    // never draw middle trees for background layers
+    if (layerName !== 'foreground' && tree.yPosition === 'middle') continue;
     
     // Efecto parallax - cada capa se mueve a diferente velocidad
     let x = (tree.x - treeOffset * speedMultiplier) % (width * 2);
@@ -404,12 +424,12 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
     
     // Dibujar árbol según su posición vertical asignada
     if (tree.yPosition === 'top') {
-      drawTree(x, trackTop - s * 2, s, tree.type, opacityMultiplier);
+      drawTree(x, (trackTop - clearance) - s * 2, s, tree.type, opacityMultiplier);
     } else if (tree.yPosition === 'middle') {
       // Árbol metido en las vías - centrado en la línea del tren
       drawTree(x, yPlayable - s * 0.3, s, tree.type, opacityMultiplier);
     } else {
-      drawTree(x, trackBottom + s * 0.5, s, tree.type, opacityMultiplier);
+      drawTree(x, (trackBottom + clearance) + s * 0.5, s, tree.type, opacityMultiplier);
     }
   }
 }
@@ -486,20 +506,22 @@ function drawTreePixels() {
 }
 
 function treeCoversIndex(idx) {
-  // Verificar si hay un árbol en este índice de píxel
-  // TODOS los árboles son obstáculos (no solo 'middle')
+  // Only trees that are BOTH:
+  // 1) on the playable row ("middle")
+  // 2) in the foreground layer (the only layer currently drawn)
   for (let tree of trees) {
+    if (tree.yPosition !== 'middle') continue;
+    if (tree.layer !== 'foreground') continue; // ✅ NEW: ignore invisible layers
+
     let worldX = tree.x - treeOffset;
     const loopWidth = width * 2;
     worldX = ((worldX % loopWidth) + loopWidth) % loopWidth;
-    
+
     const pixelIndex = floor(worldX / (width / displaySize));
-    
     if (pixelIndex === idx) return true;
   }
   return false;
 }
-
 /* ---------------- Prevenir zoom del navegador ---------------- */
 
 // Prevenir zoom con rueda del ratón + Ctrl/Cmd
