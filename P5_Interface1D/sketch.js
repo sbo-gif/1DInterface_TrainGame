@@ -9,6 +9,20 @@ let playerTwo;
 let display;
 let controller;
 
+// Sound effects - Environment
+let soundTrainMoving;
+let soundTunnelWarning;
+let soundFireWarning;
+let soundPlayerDeath;
+let soundVictory;
+
+// Sound effects - Player actions
+let soundPlayerMove;
+let soundPlayerJump;
+let soundPlayerDuck;
+let soundPlayerLand;
+let soundsLoaded = false;
+
 // Choose to be a 1- or 2-player game
 let player2Enabled = false;  // 🔁 CHANGE TO false for 1-player mode
 
@@ -55,6 +69,45 @@ let TRACK_STYLE = {
 // Árboles/vegetación
 let trees = [];
 let treeOffset = 0;
+
+// Preload function to load sound files
+function preload() {
+  // Environment sounds - ✅ AVAILABLE NOW
+  soundFireWarning = loadSound('sounds/fire.mp3');       // ✅ You have this!
+  soundPlayerDeath = loadSound('sounds/pixel-die.mp3');  // ✅ You have this!
+  
+  // Player action sounds - ✅ AVAILABLE NOW
+  soundPlayerJump = loadSound('sounds/pixel-jump.mp3');  // ✅ You have this!
+  
+  // Environment sounds - ⏳ TO DO LATER
+  // soundTrainMoving = loadSound('sounds/train.mp3');
+  // soundTunnelWarning = loadSound('sounds/warning.mp3');
+  // soundVictory = loadSound('sounds/victory.mp3');
+  
+  // Player action sounds - ⏳ TO DO LATER
+  // soundPlayerMove = loadSound('sounds/move.mp3');      // Lateral movement
+  // soundPlayerDuck = loadSound('sounds/duck.mp3');      // Drop to tracks
+  // soundPlayerLand = loadSound('sounds/land.mp3');      // Land from jump
+}
+
+// Helper functions to play sounds safely
+function playSoundSafe(sound) {
+  if (sound && sound.isLoaded()) {
+    sound.play();
+  }
+}
+
+function playSoundSafeLooped(sound) {
+  if (sound && sound.isLoaded() && !sound.isPlaying()) {
+    sound.loop();
+  }
+}
+
+function stopSoundSafe(sound) {
+  if (sound && sound.isLoaded() && sound.isPlaying()) {
+    sound.stop();
+  }
+}
 
 function setup() {
   // Taller canvas to fit instructions comfortably
@@ -132,8 +185,21 @@ function draw() {
     drawTreeLayer(yCenter, 'foreground', 1.0, 1.0); // Primer plano - 100% velocidad, opacidad total
 
     if (controller.tunnelActive) drawTunnelOverlay(yCenter);
-    if (controller.isTunnelWarning()) drawWarningText();
-    if (controller.isFireWarning()) drawFireWarningText();
+    if (controller.isTunnelWarning()) {
+      drawWarningText();
+      // Play tunnel warning sound (only once)
+      if (frameCount === controller.tunnelWarnFrame) {
+        playSoundSafe(soundTunnelWarning);
+      }
+    }
+    if (controller.isFireWarning()) {
+      drawFireWarningText();
+      // Play fire warning sound (only once)
+      const fireWarnFrame = controller.fireStartFrame - floor(TUNNEL_WARNING_SECONDS * ASSUMED_FPS);
+      if (frameCount === fireWarnFrame) {
+        playSoundSafe(soundFireWarning);
+      }
+    }
 
     drawLivesUI();
     
@@ -150,6 +216,8 @@ function draw() {
       const elapsedSeconds = (frameCount - controller.gameStartFrame) / 60;
       if (elapsedSeconds >= gameStartCountdown) {
         isTrainMoving = true;
+        // Play train moving sound when train starts
+        playSoundSafeLooped(soundTrainMoving);
       } else {
         // Draw countdown message
         drawCountdownMessage(gameStartCountdown - elapsedSeconds);
@@ -185,6 +253,9 @@ function draw() {
     if (mapProgress >= 1.0) {
       controller.gameState = "VICTORY";
       mapProgress = 1.0;
+      // Play victory sound
+      stopSoundSafe(soundTrainMoving);
+      playSoundSafe(soundVictory);
     }
     
     drawMiniMap();

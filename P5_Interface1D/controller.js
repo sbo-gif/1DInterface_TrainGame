@@ -394,6 +394,10 @@ function tickJumpTimer(player) {
     if (player.airborneFramesLeft <= 0) {
       player.isAirborne = false;
       player.airborneFramesLeft = 0;
+      // Play landing sound
+      if (typeof playSoundSafe === 'function' && typeof soundPlayerLand !== 'undefined') {
+        playSoundSafe(soundPlayerLand);
+      }
     }
   }
 }
@@ -403,6 +407,11 @@ function killPlayerAndConsumeLife(player) {
   
   const playerName = (player === playerOne) ? "Player 1 (Red)" : "Player 2 (Blue)";
   console.log(`💀 ${playerName} DIED at frame ${frameCount}, position ${player.position}, mode ${player.mode}`);
+  
+  // Play death sound
+  if (typeof playSoundSafe === 'function' && typeof soundPlayerDeath !== 'undefined') {
+    playSoundSafe(soundPlayerDeath);
+  }
   
   // Guardar la posición donde murió
   player.deathPosition = player.position;
@@ -417,6 +426,10 @@ function killPlayerAndConsumeLife(player) {
 
   if (player.lives <= 0) {
     controller.gameState = "GAME_OVER";
+    // Stop train sound on game over
+    if (typeof stopSoundSafe === 'function' && typeof soundTrainMoving !== 'undefined') {
+      stopSoundSafe(soundTrainMoving);
+    }
   }
 }
 
@@ -541,13 +554,25 @@ function tryMoveSide(player, dir) {
     if (dir === 1 && controller.rightEdge[pos]) return;
 
     const next = wrapIndex(pos + dir);
-    if (controller.wagonMask[next]) player.position = next;
+    if (controller.wagonMask[next]) {
+      player.position = next;
+      // Play movement sound
+      if (typeof playSoundSafe === 'function' && typeof soundPlayerMove !== 'undefined') {
+        playSoundSafe(soundPlayerMove);
+      }
+    }
     return;
   }
 
   if (player.mode === "TRACK") {
     const next = wrapIndex(pos + dir);
-    if (!controller.wagonMask[next]) player.position = next;
+    if (!controller.wagonMask[next]) {
+      player.position = next;
+      // Play movement sound
+      if (typeof playSoundSafe === 'function' && typeof soundPlayerMove !== 'undefined') {
+        playSoundSafe(soundPlayerMove);
+      }
+    }
   }
 }
 
@@ -570,6 +595,10 @@ function handleDownPress(player) {
     player.position = dropTo;
     player.mode = "TRACK";
     player.lastDownFrame = frameCount;
+    // Play duck/drop sound
+    if (typeof playSoundSafe === 'function' && typeof soundPlayerDuck !== 'undefined') {
+      playSoundSafe(soundPlayerDuck);
+    }
   }
 }
 
@@ -584,11 +613,19 @@ function tryJump(player) {
     if (controller.wagonMask[left]) {
       player.position = left;
       player.mode = "WAGON";
+      // Play jump sound (jump from track to wagon)
+      if (typeof playSoundSafe === 'function' && typeof soundPlayerJump !== 'undefined') {
+        playSoundSafe(soundPlayerJump);
+      }
       return;
     }
     if (controller.wagonMask[right]) {
       player.position = right;
       player.mode = "WAGON";
+      // Play jump sound (jump from track to wagon)
+      if (typeof playSoundSafe === 'function' && typeof soundPlayerJump !== 'undefined') {
+        playSoundSafe(soundPlayerJump);
+      }
       return;
     }
     return;
@@ -598,6 +635,10 @@ function tryJump(player) {
   if (player.mode === "WAGON") {
     player.isAirborne = true;
     player.airborneFramesLeft = controller.jumpFrames;
+    // Play jump sound (jump on top of wagon)
+    if (typeof playSoundSafe === 'function' && typeof soundPlayerJump !== 'undefined') {
+      playSoundSafe(soundPlayerJump);
+    }
   }
 }
 
