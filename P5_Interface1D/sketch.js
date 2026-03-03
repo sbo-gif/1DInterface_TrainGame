@@ -138,49 +138,197 @@ function draw() {
 /* ---------------- Start screen ---------------- */
 
 function drawStartScreenOverlay() {
+  // Fondo degradado dramático (amarillo/naranja/rojo como el póster)
   noStroke();
-  fill(255, 235);
-  rect(pixelSize * 0.8, pixelSize * 0.6, width - pixelSize * 1.6, height - pixelSize * 1.2, pixelSize * 0.35);
-
+  const numBands = 40;
+  const bandHeight = height / numBands;
+  
+  for (let i = 0; i < numBands; i++) {
+    const t = i / numBands;
+    let r, g, b;
+    
+    if (t < 0.3) {
+      // Parte superior: amarillo brillante
+      r = lerp(255, 255, t / 0.3);
+      g = lerp(220, 180, t / 0.3);
+      b = lerp(50, 20, t / 0.3);
+    } else if (t < 0.7) {
+      // Parte media: naranja
+      const tMid = (t - 0.3) / 0.4;
+      r = lerp(255, 220, tMid);
+      g = lerp(180, 100, tMid);
+      b = lerp(20, 10, tMid);
+    } else {
+      // Parte inferior: rojo oscuro
+      const tBot = (t - 0.7) / 0.3;
+      r = lerp(220, 140, tBot);
+      g = lerp(100, 40, tBot);
+      b = lerp(10, 10, tBot);
+    }
+    
+    fill(r, g, b);
+    rect(0, i * bandHeight, width, bandHeight);
+  }
+  
+  // Resplandor circular con gradiente (como la imagen de referencia)
+  const glowCenterX = width / 2;
+  const glowCenterY = height * 0.5;
+  const maxRadius = height * 0.45;
+  const numCircles = 30;
+  
+  for (let i = numCircles; i > 0; i--) {
+    const t = i / numCircles;
+    const radius = maxRadius * t;
+    
+    // Gradiente: amarillo brillante en el centro → naranja en el exterior
+    let r, g, b, a;
+    if (t < 0.3) {
+      // Centro: amarillo muy brillante
+      r = 255;
+      g = 250;
+      b = 150;
+      a = 80;
+    } else if (t < 0.6) {
+      // Medio: amarillo a naranja
+      const tMid = (t - 0.3) / 0.3;
+      r = 255;
+      g = lerp(250, 180, tMid);
+      b = lerp(150, 60, tMid);
+      a = lerp(80, 50, tMid);
+    } else {
+      // Exterior: naranja oscuro
+      const tOut = (t - 0.6) / 0.4;
+      r = lerp(255, 220, tOut);
+      g = lerp(180, 120, tOut);
+      b = lerp(60, 30, tOut);
+      a = lerp(50, 20, tOut);
+    }
+    
+    fill(r, g, b, a);
+    ellipse(glowCenterX, glowCenterY, radius * 2, radius * 2);
+  }
+  
+  // Silueta de persona cayendo (MÁS PEQUEÑA Y MÁS TORCIDA, DE LADO)
   fill(0);
-  textAlign(CENTER, TOP);
-
-  textSize(pixelSize * 1.05);
-  text("Surviving MBTA", width / 2, pixelSize * 0.95);
-
-  textSize(pixelSize * 0.70);
-  text("Press SPACE to start", width / 2, pixelSize * 2.15);
-
-  textAlign(LEFT, TOP);
-  textSize(pixelSize * 0.50);
-
-  const leftX = pixelSize * 1.4;
-  let y = pixelSize * 3.0;
-  const line = pixelSize * 0.75;
-
-  text("Player 1 (Red):", leftX, y); y += line;
-  text("A / D  = move left / right (on wagon)", leftX, y); y += line;
-  text("S      = duck into track at wagon edge; tap to survive", leftX, y); y += line;
-  text("W      = jump up to wagon (if on track) OR jump on top (if on wagon)", leftX, y); y += line;
-
-  y += line * 0.5;
-  text("Player 2 (Blue):", leftX, y); y += line;
-  text("J / L  = move left / right (on wagon)", leftX, y); y += line;
-  text("K      = duck into track at wagon edge; tap to survive", leftX, y); y += line;
-  text("I      = jump up to wagon (if on track) OR jump on top (if on wagon)", leftX, y); y += line;
-
-  y += line * 0.6;
-  text("Rules:", leftX, y); y += line;
-  text("- You spawn on wagons only.", leftX, y); y += line;
-  text("- If you are on the track, keep tapping DOWN (S/K) to survive.", leftX, y); y += line;
-  text("- A tunnel arrives after a warning. Duck + keep tapping DOWN to survive.", leftX, y); y += line;
-  text("- If you are on a wagon when the tunnel hits you, you die.", leftX, y); y += line;
-  text("- Fire spreads from wagon ends! Retreat to the middle.", leftX, y); y += line;
-  text("- Losing all lives ends the game.", leftX, y); y += line;
-
-  textAlign(CENTER, BOTTOM);
-  textSize(pixelSize * 0.42);
-  text("Tip: If you stop tapping DOWN on track, your blink speeds up until death.", width / 2, height - pixelSize * 1.0);
+  const centerX = width / 2;
+  const centerY = height * 0.5;
+  const ps = pixelSize * 0.4; // Mucho más pequeño
+  
+  // Persona más horizontal/de lado (como cayendo de lado)
+  
+  // CABEZA (más hacia la izquierda y arriba)
+  rect(centerX - ps * 4, centerY - ps * 2.5, ps * 2.5, ps * 2.5);
+  
+  // CUELLO (horizontal)
+  rect(centerX - ps * 1.8, centerY - ps * 2, ps * 1, ps * 0.8);
+  
+  // TORSO (horizontal/diagonal)
+  rect(centerX - ps * 1.2, centerY - ps * 2.5, ps * 4.5, ps * 3);
+  
+  // BRAZO IZQUIERDO (arriba, doblado hacia atrás)
+  rect(centerX - ps * 1.5, centerY - ps * 4.5, ps * 1.4, ps * 2);
+  rect(centerX - ps * 2.5, centerY - ps * 6, ps * 1.3, ps * 1.8);
+  rect(centerX - ps * 3.5, centerY - ps * 7.2, ps * 1.5, ps * 1.5);
+  
+  // BRAZO DERECHO (extendido hacia adelante/derecha)
+  rect(centerX + ps * 3.3, centerY - ps * 2, ps * 2, ps * 1.3);
+  rect(centerX + ps * 5, centerY - ps * 1.5, ps * 2, ps * 1.2);
+  rect(centerX + ps * 6.8, centerY - ps * 1.2, ps * 1.5, ps * 1.4);
+  
+  // PIERNA IZQUIERDA (doblada hacia atrás/arriba)
+  rect(centerX + ps * 0.5, centerY + ps * 0.5, ps * 1.6, ps * 2);
+  rect(centerX + ps * 0.2, centerY + ps * 2.2, ps * 1.4, ps * 2);
+  rect(centerX - ps * 0.5, centerY + ps * 3.8, ps * 1.8, ps * 1.2);
+  
+  // PIERNA DERECHA (extendida hacia adelante/abajo)
+  rect(centerX + ps * 2.5, centerY + ps * 0.2, ps * 1.6, ps * 2.5);
+  rect(centerX + ps * 3.5, centerY + ps * 2.5, ps * 1.4, ps * 2.2);
+  rect(centerX + ps * 4.2, centerY + ps * 4.5, ps * 1.8, ps * 1.2);
+  
+  // Texto principal estilo póster
+  fill(255, 220, 0); // Amarillo brillante
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  
+  textSize(pixelSize * 1.6);
+  text("Train surfing", width / 2, height * 0.12);
+  textSize(pixelSize * 1.8);
+  text("kills.", width / 2, height * 0.19);
+  
+  // Mensaje secundario DEBAJO del título (como en la imagen de referencia)
+  fill(255, 255, 255); // Blanco
+  textSize(pixelSize * 0.75);
+  text("Ride inside. Stay alive.", width / 2, height * 0.26);
+  
+  // Instrucción para empezar
+  fill(255, 255, 255, 200);
+  textSize(pixelSize * 0.55);
+  text("Press SPACE to start", width / 2, height * 0.86);
+  
+  // TRES VAGONES con diseño profesional
+  const wagonCount = 3;
+  const totalGaps = wagonCount - 1;
+  const availableWidth = width * 0.7;
+  const gapSize = pixelSize * 0.8;
+  const wagonWidth = (availableWidth - (totalGaps * gapSize)) / wagonCount;
+  const wagonHeight = pixelSize * 2.2;
+  const wagonY = height * 0.905;
+  const startX = (width - availableWidth) / 2;
+  
+  for (let i = 0; i < wagonCount; i++) {
+    const wagonX = startX + i * (wagonWidth + gapSize);
+    
+    // Cuerpo principal del vagón (gris oscuro metálico)
+    fill(75, 75, 80);
+    rect(wagonX, wagonY, wagonWidth, wagonHeight);
+    
+    // Techo del vagón (más oscuro)
+    fill(60, 60, 65);
+    rect(wagonX, wagonY - pixelSize * 0.4, wagonWidth, pixelSize * 0.4);
+    
+    // Base/ruedas del vagón (más oscuro)
+    fill(55, 55, 60);
+    rect(wagonX, wagonY + wagonHeight - pixelSize * 0.35, wagonWidth, pixelSize * 0.35);
+    
+    // Ventanas (3 por vagón, bien espaciadas)
+    fill(45, 50, 55);
+    const windowWidth = wagonWidth * 0.22;
+    const windowHeight = wagonHeight * 0.5;
+    const windowY = wagonY + wagonHeight * 0.25;
+    const windowSpacing = (wagonWidth - (3 * windowWidth)) / 4;
+    
+    for (let w = 0; w < 3; w++) {
+      const windowX = wagonX + windowSpacing + w * (windowWidth + windowSpacing);
+      rect(windowX, windowY, windowWidth, windowHeight);
+      
+      // Reflejos en ventanas (detalles sutiles)
+      fill(70, 75, 80, 100);
+      rect(windowX, windowY, windowWidth * 0.3, windowHeight * 0.3);
+    }
+    
+    // Líneas de detalle (bandas metálicas)
+    fill(85, 85, 90);
+    rect(wagonX, wagonY + wagonHeight * 0.15, wagonWidth, pixelSize * 0.15);
+    rect(wagonX, wagonY + wagonHeight * 0.78, wagonWidth, pixelSize * 0.15);
+    
+    // Puerta (en el centro, diferente textura)
+    fill(68, 68, 73);
+    const doorWidth = wagonWidth * 0.28;
+    const doorX = wagonX + (wagonWidth - doorWidth) / 2;
+    rect(doorX, wagonY + wagonHeight * 0.2, doorWidth, wagonHeight * 0.65);
+    
+    // Detalle de puerta (línea central)
+    fill(58, 58, 63);
+    rect(doorX + doorWidth * 0.48, wagonY + wagonHeight * 0.2, pixelSize * 0.12, wagonHeight * 0.65);
+    
+    // Ruedas visibles
+    fill(40, 40, 45);
+    const wheelSize = pixelSize * 0.4;
+    rect(wagonX + wagonWidth * 0.15, wagonY + wagonHeight - pixelSize * 0.2, wheelSize, wheelSize);
+    rect(wagonX + wagonWidth * 0.75, wagonY + wagonHeight - pixelSize * 0.2, wheelSize, wheelSize);
+  }
+  
+  textStyle(NORMAL);
 }
 
 /* ---------------- Player icon ---------------- */
