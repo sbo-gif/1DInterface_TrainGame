@@ -55,7 +55,7 @@ function setup() {
   // Track colors
   TRACK_COLORS.rail = color(0);
   TRACK_COLORS.sleeper = color(120, 90, 20); // Marrón original
-  TRACK_COLORS.background = color(120, 160, 100); // Verde césped pixel art
+  TRACK_COLORS.background = color(40, 70, 45); // Verde bosque oscuro
 
   // Track geometry
   TRACK_STYLE.railThicknessPx = max(3, pixelSize * 0.12);
@@ -71,7 +71,8 @@ function setup() {
 }
 
 function draw() {
-  background(TRACK_COLORS.background);
+  // Fondo degradado de bosque pixelado
+  drawForestBackground();
 
   // Track animation always running
   sleeperOffset = (sleeperOffset + sleeperSpeed) % (pixelSize * 2);
@@ -81,10 +82,10 @@ function draw() {
   const yCenter = height * 0.5;
   const yPlayable = yCenter - pixelSize / 2;
 
-  // Background trees (visual only)
-  drawTreeLayer(yCenter, 'far', 0.25, 0.25);
-  drawTreeLayer(yCenter, 'mid', 0.45, 0.45);
-  drawTreeLayer(yCenter, 'close', 0.70, 0.70);
+  // Background trees (visual only) - todos a la misma velocidad
+  drawTreeLayer(yCenter, 'far', 1.0, 0.35);     // Misma velocidad, más transparentes
+  drawTreeLayer(yCenter, 'mid', 1.0, 0.55);     // Misma velocidad, opacidad media
+  drawTreeLayer(yCenter, 'close', 1.0, 0.75);   // Misma velocidad, más opacos
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
@@ -475,6 +476,94 @@ function drawGameOver() {
   text("GAME OVER (press R)", width / 2, pixelSize * 1.4);
 }
 
+/* ---------------- Fondo de bosque pixelado ---------------- */
+
+function drawForestBackground() {
+  noStroke();
+  
+  // Crear un degradado vertical con bandas de colores del bosque
+  // Colores inspirados en bosques pixelados: verdes oscuros, marrones, tonos naturales
+  const numBands = 30;
+  const bandHeight = height / numBands;
+  
+  for (let i = 0; i < numBands; i++) {
+    const t = i / numBands;
+    
+    // Degradado de arriba (más claro) a abajo (más oscuro)
+    // Top: Verde claro del follaje alto
+    // Middle: Verde medio del bosque
+    // Bottom: Verde muy oscuro/marrón del suelo del bosque
+    let r, g, b;
+    
+    if (t < 0.3) {
+      // Parte superior: verde follaje claro
+      r = lerp(50, 45, t / 0.3);
+      g = lerp(85, 75, t / 0.3);
+      b = lerp(50, 45, t / 0.3);
+    } else if (t < 0.7) {
+      // Parte media: verde bosque medio
+      const tMid = (t - 0.3) / 0.4;
+      r = lerp(45, 35, tMid);
+      g = lerp(75, 60, tMid);
+      b = lerp(45, 40, tMid);
+    } else {
+      // Parte inferior: verde muy oscuro/suelo
+      const tBot = (t - 0.7) / 0.3;
+      r = lerp(35, 25, tBot);
+      g = lerp(60, 45, tBot);
+      b = lerp(40, 30, tBot);
+    }
+    
+    // Agregar variación sutil para textura pixelada
+    const noise = sin(i * 0.5 + frameCount * 0.01) * 3;
+    
+    fill(r + noise, g + noise, b + noise);
+    rect(0, i * bandHeight, width, bandHeight);
+  }
+  
+  // Agregar "manchas" de vegetación para textura
+  drawForestTexture();
+}
+
+function drawForestTexture() {
+  noStroke();
+  
+  // Manchas oscuras que se mueven con el tren
+  // Usar treeOffset para crear movimiento sincronizado
+  randomSeed(42); // Seed fijo para patrones consistentes
+  
+  for (let i = 0; i < 50; i++) {
+    const baseX = random(width * 2);
+    const y = random(height);
+    const size = random(pixelSize * 0.3, pixelSize * 1.5);
+    
+    // Aplicar offset de movimiento (mismo que árboles y vías)
+    let x = (baseX - treeOffset) % (width * 2);
+    if (x < -pixelSize * 4) x += width * 2;
+    
+    // Color más oscuro que el fondo
+    fill(20, 40, 25, 60);
+    
+    // Forma pixelada (rectángulo)
+    rect(x, y, size, size);
+  }
+  
+  // Manchas claras para variedad (luz filtrada)
+  for (let i = 0; i < 30; i++) {
+    const baseX = random(width * 2);
+    const y = random(height * 0.4); // Solo en la parte superior
+    const size = random(pixelSize * 0.2, pixelSize * 0.8);
+    
+    // Aplicar offset de movimiento
+    let x = (baseX - treeOffset) % (width * 2);
+    if (x < -pixelSize * 4) x += width * 2;
+    
+    // Color más claro
+    fill(60, 95, 60, 40);
+    rect(x, y, size, size);
+  }
+}
+
 /* ---------------- Track band (sleepers behind, rails on top) ---------------- */
 
 function drawFatCenterTrackBand(yCenter, offsetPx) {
@@ -508,72 +597,82 @@ function initializeTrees() {
   trees = [];
   
   // PRIMERO: Crear algunos árboles ESPECÍFICAMENTE sobre las vías (middle)
-  const numMiddleTrees = 4; // Árboles garantizados sobre las vías
+  const numMiddleTrees = 5; // Árboles sobre las vías (obstáculos)
   for (let i = 0; i < numMiddleTrees; i++) {
-    // Estos árboles SIEMPRE estarán en posición 'middle' (sobre las vías)
     let layer = 'foreground'; 
-    let scale = (layer === 'foreground') ? random(2.0, 3.0) : random(1.4, 2.0);
+    let scale = random(2.0, 3.5);
     
     trees.push({
       x: random(width * 2),
-      type: floor(random(3)),
+      type: floor(random(6)), // Ahora 6 tipos diferentes
       scale: scale,
       layer: layer,
-      yPosition: 'middle' // SIEMPRE sobre las vías
+      yPosition: 'middle',
+      colorVariant: floor(random(4)) // 4 variantes de color
     });
   }
   
-  // SEGUNDO: Crear árboles adicionales en posiciones aleatorias
-  const numRandomTrees = 4; // Árboles en posiciones aleatorias
-  for (let i = 0; i < numRandomTrees; i++) {
-    // Posición vertical: top, middle, o bottom (aleatorio)
-    let yPos;
-    const rand = random();
-    if (rand < 0.3) {
-      yPos = 'top';
-    } else if (rand < 0.6) {
-      yPos = 'middle';
-    } else {
-      yPos = 'bottom';
-    }
+  // SEGUNDO: Crear MUCHÍSIMOS árboles de fondo (lejos) - bosque MUY denso
+  const numFarTrees = 80; // Mucho más denso
+  for (let i = 0; i < numFarTrees; i++) {
+    let yPos = (random() < 0.5) ? 'top' : 'bottom';
+    let scale = random(0.4, 1.2);
     
-    // Asignar capa de profundidad: far, mid, close, foreground
-    let layer;
-    let layerRand = random();
-    if (layerRand < 0.25) {
-      layer = 'far';      // Más lejos - más pequeño
-    } else if (layerRand < 0.5) {
-      layer = 'mid';      // Medio
-    } else if (layerRand < 0.75) {
-      layer = 'close';    // Cerca
-    } else {
-      layer = 'foreground'; // Primer plano - más grande
-    }
+    trees.push({
+      x: random(width * 4), // Distribuidos en área más amplia
+      type: floor(random(6)),
+      scale: scale,
+      layer: 'far',
+      yPosition: yPos,
+      colorVariant: floor(random(4))
+    });
+  }
+  
+  // TERCERO: Crear MUCHÍSIMOS árboles de capa media - bosque MUY denso
+  const numMidTrees = 60;
+  for (let i = 0; i < numMidTrees; i++) {
+    let yPos = (random() < 0.5) ? 'top' : 'bottom';
+    let scale = random(0.9, 1.8);
     
-    // Escala según la capa
-    let scale;
-    if (layer === 'far') {
-      scale = random(0.5, 0.9);  // Muy pequeños (fondo)
-    } else if (layer === 'mid') {
-      scale = random(0.9, 1.4);  // Medianos
-    } else if (layer === 'close') {
-      scale = random(1.4, 2.0);  // Grandes
-    } else {
-      scale = random(2.0, 3.0);  // Muy grandes (primer plano)
-    }
-
-    // prevent background trees from appearing on the track corridor
-    if (layer !== 'foreground' && yPos === 'middle') {
-      yPos = (random() < 0.5) ? 'top' : 'bottom';
-    }
-
+    trees.push({
+      x: random(width * 3.5),
+      type: floor(random(6)),
+      scale: scale,
+      layer: 'mid',
+      yPosition: yPos,
+      colorVariant: floor(random(4))
+    });
+  }
+  
+  // CUARTO: Crear MUCHÍSIMOS árboles cercanos (no en las vías) - bosque MUY denso
+  const numCloseTrees = 45;
+  for (let i = 0; i < numCloseTrees; i++) {
+    let yPos = (random() < 0.5) ? 'top' : 'bottom';
+    let scale = random(1.5, 2.5);
+    
+    trees.push({
+      x: random(width * 2.5),
+      type: floor(random(6)),
+      scale: scale,
+      layer: 'close',
+      yPosition: yPos,
+      colorVariant: floor(random(4))
+    });
+  }
+  
+  // QUINTO: Crear árboles de primer plano adicionales (no en vías)
+  const numForegroundTrees = 12;
+  for (let i = 0; i < numForegroundTrees; i++) {
+    let yPos = (random() < 0.5) ? 'top' : 'bottom';
+    let scale = random(2.5, 4.0);
     
     trees.push({
       x: random(width * 2),
-      type: floor(random(3)),
+      type: floor(random(6)),
       scale: scale,
-      layer: layer,
-      yPosition: yPos
+      layer: 'foreground',
+      yPosition: yPos,
+      colorVariant: floor(random(4))
     });
   }
 }
@@ -616,45 +715,78 @@ function drawTree(x, y, size, type, opacity) {
   push();
   noStroke();
   
-  // Árboles delicados y minimalistas - diseño elegante para 
+  // Árboles pixelados estilizados inspirados en bosques naturales
+  // Paleta de colores más rica y natural
+  
   if (type === 0) {
-    // Árbol tipo 1: Copa circular pequeña y delicada
-    fill(34, 100, 34, 255 * opacity); // Verde oscuro exterior
-    rect(x - size * 0.35, y + size * 0.3, size * 0.7, size * 0.5);
-    rect(x - size * 0.25, y + size * 0.2, size * 0.5, size * 0.1);
-    rect(x - size * 0.25, y + size * 0.8, size * 0.5, size * 0.1);
+    // Árbol tipo 1: Roble frondoso con copa redondeada
+    // Copa exterior (más oscura)
+    fill(28, 70, 35, 255 * opacity); // Verde bosque profundo
+    rect(x - size * 0.4, y + size * 0.25, size * 0.8, size * 0.6);
+    rect(x - size * 0.3, y + size * 0.15, size * 0.6, size * 0.1);
+    rect(x - size * 0.3, y + size * 0.85, size * 0.6, size * 0.1);
     
-    fill(45, 85, 40, 255 * opacity); // Verde oscuro interior - elegante
-    rect(x - size * 0.2, y + size * 0.4, size * 0.4, size * 0.3);
+    // Copa interior (más clara - luz del sol)
+    fill(40, 90, 45, 255 * opacity); // Verde medio iluminado
+    rect(x - size * 0.25, y + size * 0.35, size * 0.5, size * 0.4);
     
-    // Tronco muy pequeño
-    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
-    rect(x - size * 0.08, y + size * 0.85, size * 0.16, size * 0.2);
+    // Detalles de luz (highlights)
+    fill(55, 110, 55, 200 * opacity); // Verde claro
+    rect(x - size * 0.15, y + size * 0.4, size * 0.3, size * 0.15);
+    
+    // Tronco robusto con textura
+    fill(65, 45, 25, 255 * opacity); // Marrón corteza
+    rect(x - size * 0.1, y + size * 0.85, size * 0.2, size * 0.25);
+    
+    // Sombra del tronco
+    fill(45, 30, 18, 180 * opacity);
+    rect(x + size * 0.02, y + size * 0.9, size * 0.08, size * 0.2);
     
   } else if (type === 1) {
-    // Árbol tipo 2: Pino pequeño y delicado
-    fill(34, 100, 34, 255 * opacity); // Verde oscuro
-    // Forma triangular simple
-    rect(x - size * 0.3, y + size * 0.6, size * 0.6, size * 0.15);
-    rect(x - size * 0.25, y + size * 0.45, size * 0.5, size * 0.15);
-    rect(x - size * 0.2, y + size * 0.3, size * 0.4, size * 0.15);
-    rect(x - size * 0.1, y + size * 0.2, size * 0.2, size * 0.1);
+    // Árbol tipo 2: Pino/conífera elegante
+    // Copa triangular en capas
+    fill(25, 65, 30, 255 * opacity); // Verde pino oscuro
     
-    // Tronco muy pequeño
-    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
-    rect(x - size * 0.08, y + size * 0.75, size * 0.16, size * 0.25);
+    // Capa inferior (más ancha)
+    rect(x - size * 0.35, y + size * 0.65, size * 0.7, size * 0.15);
+    // Capa media
+    rect(x - size * 0.28, y + size * 0.5, size * 0.56, size * 0.15);
+    rect(x - size * 0.22, y + size * 0.35, size * 0.44, size * 0.15);
+    // Capa superior (punta)
+    rect(x - size * 0.15, y + size * 0.25, size * 0.3, size * 0.1);
+    rect(x - size * 0.08, y + size * 0.18, size * 0.16, size * 0.07);
+    
+    // Highlights en las capas (nieve o luz)
+    fill(50, 100, 50, 180 * opacity);
+    rect(x - size * 0.18, y + size * 0.52, size * 0.36, size * 0.08);
+    rect(x - size * 0.12, y + size * 0.37, size * 0.24, size * 0.08);
+    
+    // Tronco delgado
+    fill(70, 50, 30, 255 * opacity);
+    rect(x - size * 0.07, y + size * 0.75, size * 0.14, size * 0.28);
     
   } else {
-    // Árbol tipo 3: Arbusto pequeño y compacto
-    fill(34, 100, 34, 255 * opacity); // Verde oscuro
-    rect(x - size * 0.3, y + size * 0.35, size * 0.6, size * 0.5);
+    // Árbol tipo 3: Árbol de hoja perenne bajo (arbusto grande)
+    // Copa redondeada y densa
+    fill(30, 75, 38, 255 * opacity); // Verde medio-oscuro
+    rect(x - size * 0.35, y + size * 0.4, size * 0.7, size * 0.45);
+    rect(x - size * 0.25, y + size * 0.3, size * 0.5, size * 0.1);
     
-    fill(45, 85, 40, 255 * opacity); // Verde oscuro interior - elegante
-    rect(x - size * 0.2, y + size * 0.45, size * 0.4, size * 0.3);
+    // Parte interna más clara
+    fill(42, 88, 45, 255 * opacity); // Verde medio
+    rect(x - size * 0.25, y + size * 0.5, size * 0.5, size * 0.25);
     
-    // Tronco muy pequeño
-    fill(80, 55, 30, 255 * opacity); // Marrón más oscuro
-    rect(x - size * 0.08, y + size * 0.8, size * 0.16, size * 0.2);
+    // Highlights superiores
+    fill(58, 105, 58, 200 * opacity); // Verde claro
+    rect(x - size * 0.18, y + size * 0.45, size * 0.36, size * 0.15);
+    
+    // Tronco corto y grueso
+    fill(68, 48, 28, 255 * opacity);
+    rect(x - size * 0.09, y + size * 0.8, size * 0.18, size * 0.22);
+    
+    // Sombra
+    fill(48, 32, 20, 160 * opacity);
+    rect(x + size * 0.01, y + size * 0.85, size * 0.08, size * 0.17);
   }
   
   pop();
