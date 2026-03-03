@@ -18,13 +18,13 @@ let STARTING_LIVES = 3;
 let ASSUMED_FPS = 60;
 
 // ===== FIRE TOGGLES =====
-let TIME_UNTIL_FIRE = 30.0;                    // seconds before fire starts
+let TIME_UNTIL_FIRE = 25.0;                    // seconds before fire starts
 let FIRE_SPREAD_INTERVAL_SECONDS = 2.0;        // seconds between each pixel igniting (outer wagons)
 let FIRE_PHASE2_DELAY_SECONDS = 5.0;           // pause after outer wagons burn before middle starts
 let FIRE_PHASE2_SPREAD_INTERVAL_SECONDS = 6.0; // slow spread on middle wagon
 
 // ===== TUNNEL TOGGLES =====
-let TIME_UNTIL_TUNNEL = 1.0;
+let TIME_UNTIL_TUNNEL = 10.0; // First tunnel at 10 seconds
 let TUNNEL_WARNING_SECONDS = 2.0;
 let TUNNEL_WIDTH_PIXELS = 5;
 
@@ -33,7 +33,7 @@ let TUNNEL_SPEED_COLS_PER_SEC = 4.0; // Reducido a la mitad (antes era 8.0)
 
 class Controller {
   constructor() {
-    this.gameState = "START"; // START -> PLAY -> GAME_OVER
+    this.gameState = "START"; // START -> PLAY -> GAME_OVER or VICTORY
 
     // Train layout parameters (1D pixels)
     this.wagonLength = 7;
@@ -84,11 +84,18 @@ class Controller {
 
   startGame() {
     this.gameState = "PLAY";
+    this.gameStartFrame = frameCount; // Track when game started
 
     playerOne.lives = STARTING_LIVES;
     if (player2Enabled) {
       playerTwo.lives = STARTING_LIVES;
     }   
+
+    // Reset map progress
+    mapProgress = 0;
+    stationBuildingX = 0; // Reset station building position
+    endStationX = 0; // Reset end station position
+    isTrainMoving = false; // Reset train movement flag
 
     this.computeTrainLayout();
     this.spawnPlayerOnWagon(playerOne);
@@ -188,11 +195,18 @@ class Controller {
   }
 
   spawnPlayerOnWagon(player, avoidIndex = null, specificPosition = null) {
-    // Si se especifica una posición, usarla; si no, elegir aleatoria
+    // Si se especifica una posición, usarla; si no, usar el primer vagón (izquierda)
     if (specificPosition !== null && this.wagonMask[specificPosition] && !this.fireMask[specificPosition]) {
       player.position = specificPosition;
     } else {
-      player.position = this.randomWagonIndex(avoidIndex);
+      // Spawn en el primer pixel del primer vagón (más a la izquierda)
+      const firstWagonStart = this.getWagonStart(0);
+      if (this.wagonMask[firstWagonStart] && !this.fireMask[firstWagonStart]) {
+        player.position = firstWagonStart;
+      } else {
+        // Fallback: posición aleatoria si el primer vagón no está disponible
+        player.position = this.randomWagonIndex(avoidIndex);
+      }
     }
     
     player.mode = "WAGON";
@@ -343,8 +357,11 @@ class Controller {
     }
 
     if (this.gameState !== "PLAY") return;
+    
+    // Don't update hazards until train is moving
+    if (!isTrainMoving) return;
 
-    // Gameplay only in PLAY
+    // Gameplay only in PLAY after countdown
     this.updateTunnel();
     this.updateFire();
 
@@ -661,7 +678,7 @@ function keyPressed() {
   }
 
   // Game over -> back to start
-  if (controller.gameState === "GAME_OVER") {
+  if (controller.gameState === "GAME_OVER" || controller.gameState === "VICTORY") {
     if (key === 'R' || key === 'r') {
       controller.gameState = "START";
       controller.resetTunnelSchedule();

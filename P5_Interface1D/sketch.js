@@ -16,6 +16,21 @@ let player2Enabled = false;  // 🔁 CHANGE TO false for 1-player mode
 let sleeperOffset = 0;
 let sleeperSpeed = 1.5; // Reducido a la mitad (antes era 3)
 
+// Mini-map progress (fictitious distance)
+let mapProgress = 0; // 0 to 1 (0 = start station, 1 = end station)
+let mapProgressSpeed = 0.00048; // Speed adjusted for ~35 second game
+
+// Start station building position
+let stationBuildingX = 0; // X position (scrolls left as game progresses)
+
+// End station building position (appears when close to finish)
+let endStationX = 0; // X position (starts off-screen right, moves left)
+let endStationAppearProgress = 0.60; // Progress threshold to show end station (60% for shorter game)
+
+// Game start countdown (train waits at station)
+let gameStartCountdown = 3.0; // seconds to wait before train starts moving
+let isTrainMoving = false;
+
 // Toggles
 let showCenterTrack = true;
 let playerIconShape = "square"; // "square" or "circle"
@@ -74,9 +89,11 @@ function draw() {
   // Fondo degradado de bosque pixelado
   drawForestBackground();
 
-  // Track animation always running
-  sleeperOffset = (sleeperOffset + sleeperSpeed) % (pixelSize * 2);
-  treeOffset = treeOffset + sleeperSpeed; // Árboles se mueven continuamente SIN módulo
+  // Track animation always running (but paused during countdown)
+  if (controller.gameState === "PLAY" && isTrainMoving) {
+    sleeperOffset = (sleeperOffset + sleeperSpeed) % (pixelSize * 2);
+    treeOffset = treeOffset + sleeperSpeed;
+  }
 
   // Place the track/train row higher to leave room for instructions
   const yCenter = height * 0.5;
@@ -88,6 +105,12 @@ function draw() {
   drawTreeLayer(yCenter, 'close', 1.0, 0.75);   // Misma velocidad, más opacos
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
+
+  // Draw start station building (scrolls left as game progresses)
+  if (controller.gameState === "PLAY") {
+    drawStationBuilding(yCenter);
+    drawEndStationBuilding(yCenter);
+  }
 
   // Controller draws wagons row (and gameplay if in PLAY)
   controller.update();
@@ -121,6 +144,17 @@ function draw() {
     if (playerTwo.isDead && playerTwo.lives > 0) {
       drawRespawnMessage(playerTwo, "Player 2");
     }
+    
+    // Check countdown (dibujado AL FINAL para estar encima de todo)
+    if (!isTrainMoving) {
+      const elapsedSeconds = (frameCount - controller.gameStartFrame) / 60;
+      if (elapsedSeconds >= gameStartCountdown) {
+        isTrainMoving = true;
+      } else {
+        // Draw countdown message
+        drawCountdownMessage(gameStartCountdown - elapsedSeconds);
+      }
+    }
   }
 
  
@@ -131,7 +165,34 @@ function draw() {
 
   if (controller.gameState === "GAME_OVER") {
     drawLivesUI();
+    drawMiniMap(); // Show progress even after game over
     drawGameOver();
+  }
+
+  // Draw mini-map (always visible during play)
+  if (controller.gameState === "PLAY") {
+    // Only progress if train is moving
+    if (isTrainMoving) {
+      mapProgress += mapProgressSpeed;
+      // Move station building to the left (same speed as sleepers/track)
+      stationBuildingX -= sleeperSpeed;
+      
+      // Move end station from right to left (same speed)
+      endStationX -= sleeperSpeed;
+    }
+    
+    // Check if reached the end
+    if (mapProgress >= 1.0) {
+      controller.gameState = "VICTORY";
+      mapProgress = 1.0;
+    }
+    
+    drawMiniMap();
+  }
+  
+  if (controller.gameState === "VICTORY") {
+    drawMiniMap();
+    drawVictoryScreen();
   }
 }
 
@@ -607,6 +668,53 @@ function drawGameOver() {
   text("GAME OVER (press R)", width / 2, pixelSize * 1.4);
 }
 
+function drawVictoryScreen() {
+  // Victory overlay
+  fill(0, 0, 0, 180);
+  rect(0, 0, width, height);
+  
+  // Victory message
+  fill(255, 220, 50); // Gold
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(pixelSize * 1.2);
+  text("YOU ARRIVED!", width / 2, height * 0.4);
+  
+  // Sub message
+  fill(255, 255, 255);
+  textSize(pixelSize * 0.6);
+  text("You reached the destination station", width / 2, height * 0.5);
+  
+  // Restart instruction
+  fill(255, 255, 255, 200);
+  textSize(pixelSize * 0.5);
+  text("Press R to restart", width / 2, height * 0.65);
+  
+  textStyle(NORMAL);
+}
+
+function drawCountdownMessage(secondsLeft) {
+  // Semi-transparent overlay
+  fill(0, 0, 0, 120);
+  noStroke();
+  rect(0, 0, width, height);
+  
+  // Countdown number
+  fill(255, 220, 50); // Gold
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(pixelSize * 2);
+  text(ceil(secondsLeft), width / 2, height * 0.4);
+  
+  // Message
+  fill(255, 255, 255);
+  textSize(pixelSize * 0.65);
+  text("Train departing...", width / 2, height * 0.55);
+  
+  textStyle(NORMAL);
+}
+
 /* ---------------- Fondo de bosque pixelado ---------------- */
 
 function drawForestBackground() {
@@ -924,11 +1032,39 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
 
   noStroke();
   
+  // Progressive difficulty: fewer trees at the start
+  let treeChance = 1.0; // Default: show all trees
+  if (controller.gameState === "PLAY" && isTrainMoving) {
+    const gameTime = (frameCount - controller.gameStartFrame) / 60;
+    if (gameTime < 5) {
+      // First 5 seconds: only 20% of trees
+      treeChance = 0.2;
+    } else if (gameTime < 10) {
+      // 5-10 seconds: 50% of trees
+      treeChance = 0.5;
+    } else if (gameTime < 15) {
+      // 10-15 seconds: 75% of trees
+      treeChance = 0.75;
+    }
+    // After 15 seconds: 100% of trees
+  }
+  
   for (let tree of trees) {
     // Filtrar por capa
     if (tree.layer !== layerName) continue;
     // never draw middle trees for background layers
     if (layerName !== 'foreground' && tree.yPosition === 'middle') continue;
+    
+    // Progressive difficulty filter
+    if (treeChance < 1.0) {
+      // Use tree's position as a seed for consistent filtering
+      randomSeed(tree.x * 1000);
+      if (random() > treeChance) {
+        randomSeed(frameCount); // Reset seed
+        continue;
+      }
+      randomSeed(frameCount); // Reset seed
+    }
     
     // Efecto parallax - cada capa se mueve a diferente velocidad
     let x = (tree.x - treeOffset * speedMultiplier) % (width * 2);
@@ -1194,6 +1330,225 @@ function treeCoversIndex(idx) {
   }
   return false;
 }
+/* ---------------- Mini-map (bottom left) ---------------- */
+
+function drawMiniMap() {
+  // Map dimensions
+  const mapX = pixelSize * 0.8;
+  const mapY = height - pixelSize * 2.5;
+  const mapWidth = pixelSize * 8;
+  
+  // Two brown boxes (stations)
+  const boxSize = pixelSize * 0.6;
+  noStroke();
+  fill(120, 90, 50); // Brown
+  
+  // Station 1 (left)
+  rect(mapX, mapY - boxSize / 2, boxSize, boxSize);
+  
+  // Station 2 (right)
+  rect(mapX + mapWidth - boxSize, mapY - boxSize / 2, boxSize, boxSize);
+  
+  // Line between them
+  stroke(120, 90, 50); // Brown
+  strokeWeight(pixelSize * 0.1);
+  line(mapX + boxSize, mapY, mapX + mapWidth - boxSize, mapY);
+  noStroke();
+  
+  // Moving dot (progress indicator)
+  const dotX = mapX + boxSize + mapProgress * (mapWidth - 2 * boxSize);
+  const dotY = mapY;
+  
+  fill(255, 0, 0); // Red dot (player color)
+  const dotSize = pixelSize * 0.3;
+  ellipse(dotX, dotY, dotSize, dotSize);
+}
+
+/* ---------------- Station Building (simple brown box) ---------------- */
+
+function drawStationBuilding(yCenter) {
+  const yPlayable = yCenter - pixelSize / 2;
+  
+  // Building position (scrolls left with track movement)
+  const buildingX = stationBuildingX;
+  
+  // Only draw if still visible on screen
+  if (buildingX < -pixelSize * 4) return;
+  
+  // Simple brown box (like mini-map station) - más estrecho
+  const boxWidth = pixelSize * 2; // Reducido de 3 a 2
+  const boxTop = yPlayable - pixelSize * 2;
+  const boxHeight = pixelSize * 5;
+  
+  noStroke();
+  
+  // Dark brown box (matches mini-map color)
+  fill(120, 90, 50);
+  rect(buildingX, boxTop, boxWidth, boxHeight);
+  
+  // Darker inner shadow
+  fill(90, 70, 40);
+  rect(buildingX + boxWidth * 0.7, boxTop, boxWidth * 0.3, boxHeight);
+}
+
+/* ---------------- End Station Building (appears near finish) ---------------- */
+
+function drawEndStationBuilding(yCenter) {
+  // Only show when close to finish
+  if (mapProgress < endStationAppearProgress) return;
+  
+  const yPlayable = yCenter - pixelSize / 2;
+  
+  // Building position (scrolls left with track movement)
+  // Starts from right side of screen when it appears
+  const progressSinceAppear = (mapProgress - endStationAppearProgress) / (1.0 - endStationAppearProgress);
+  const initialX = width + pixelSize * 2;
+  const buildingX = initialX + endStationX;
+  
+  // Only draw if visible on screen
+  if (buildingX > width + pixelSize * 4 || buildingX < -pixelSize * 4) return;
+  
+  // Simple brown box (like mini-map station) - same as start station
+  const boxWidth = pixelSize * 2;
+  const boxTop = yPlayable - pixelSize * 2;
+  const boxHeight = pixelSize * 5;
+  
+  noStroke();
+  
+  // Dark brown box (matches mini-map color)
+  fill(120, 90, 50);
+  rect(buildingX, boxTop, boxWidth, boxHeight);
+  
+  // Darker inner shadow
+  fill(90, 70, 40);
+  rect(buildingX + boxWidth * 0.7, boxTop, boxWidth * 0.3, boxHeight);
+}
+
+/* ---------------- Station Tunnel (simple brown box) ---------------- */
+
+function drawStationTunnel(yCenter) {
+  const yPlayable = yCenter - pixelSize / 2;
+  
+  // Tunnel dimensions - simple rectangular tunnel
+  const tunnelX = 0; // Left edge of screen
+  const tunnelWidth = pixelSize * 3;
+  const tunnelTop = yPlayable - pixelSize * 2;
+  const tunnelHeight = pixelSize * 5;
+  
+  noStroke();
+  
+  // Dark brown tunnel (matches mini-map color)
+  fill(90, 70, 40);
+  rect(tunnelX, tunnelTop, tunnelWidth, tunnelHeight);
+  
+  // Darker inner shadow
+  fill(60, 45, 25);
+  rect(tunnelX + tunnelWidth * 0.7, tunnelTop, tunnelWidth * 0.3, tunnelHeight);
+  
+  // Top edge darker
+  fill(70, 55, 30);
+  rect(tunnelX, tunnelTop, tunnelWidth, pixelSize * 0.3);
+  
+  // Bottom edge darker
+  fill(70, 55, 30);
+  rect(tunnelX, tunnelTop + tunnelHeight - pixelSize * 0.3, tunnelWidth, pixelSize * 0.3);
+}
+
+/* ---------------- Station Portal/Arch ---------------- */
+
+function drawStationPortal(yCenter, stationType) {
+  const yPlayable = yCenter - pixelSize / 2;
+  
+  // Portal position based on type
+  let portalX;
+  if (stationType === 'start') {
+    // Start station portal - left side of screen
+    portalX = pixelSize * 2;
+  } else {
+    // End station portal - right side of screen (when player progresses far enough)
+    portalX = width - pixelSize * 3;
+  }
+  
+  // Portal dimensions
+  const pillarWidth = pixelSize * 1.2;
+  const pillarHeight = pixelSize * 4;
+  const archWidth = pixelSize * 4;
+  const archThickness = pixelSize * 0.8;
+  
+  // Track references
+  const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
+  const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
+  
+  noStroke();
+  
+  // Color scheme - stone/brick
+  const stoneBase = color(110, 105, 100);
+  const stoneDark = color(80, 75, 70);
+  const stoneLight = color(140, 135, 130);
+  
+  // LEFT PILLAR
+  const leftPillarX = portalX - archWidth / 2;
+  
+  // Pillar base (darker)
+  fill(stoneDark);
+  rect(leftPillarX, trackTop - pillarHeight, pillarWidth, pillarHeight);
+  
+  // Pillar main body
+  fill(stoneBase);
+  rect(leftPillarX + pillarWidth * 0.15, trackTop - pillarHeight, pillarWidth * 0.7, pillarHeight);
+  
+  // Pillar highlights (lighter)
+  fill(stoneLight);
+  rect(leftPillarX + pillarWidth * 0.2, trackTop - pillarHeight, pillarWidth * 0.2, pillarHeight * 0.3);
+  
+  // Pillar capital (top decoration)
+  fill(stoneDark);
+  rect(leftPillarX - pillarWidth * 0.1, trackTop - pillarHeight - pixelSize * 0.4, pillarWidth * 1.2, pixelSize * 0.4);
+  
+  // RIGHT PILLAR
+  const rightPillarX = portalX + archWidth / 2 - pillarWidth;
+  
+  // Pillar base (darker)
+  fill(stoneDark);
+  rect(rightPillarX, trackTop - pillarHeight, pillarWidth, pillarHeight);
+  
+  // Pillar main body
+  fill(stoneBase);
+  rect(rightPillarX + pillarWidth * 0.15, trackTop - pillarHeight, pillarWidth * 0.7, pillarHeight);
+  
+  // Pillar highlights (lighter)
+  fill(stoneLight);
+  rect(rightPillarX + pillarWidth * 0.6, trackTop - pillarHeight, pillarWidth * 0.2, pillarHeight * 0.3);
+  
+  // Pillar capital (top decoration)
+  fill(stoneDark);
+  rect(rightPillarX - pillarWidth * 0.1, trackTop - pillarHeight - pixelSize * 0.4, pillarWidth * 1.2, pixelSize * 0.4);
+  
+  // ARCH/BEAM connecting the pillars
+  const beamY = trackTop - pillarHeight - pixelSize * 0.4;
+  const beamX = leftPillarX;
+  const beamWidth = archWidth;
+  
+  // Beam base
+  fill(stoneDark);
+  rect(beamX, beamY, beamWidth, archThickness);
+  
+  // Beam highlight
+  fill(stoneLight);
+  rect(beamX, beamY, beamWidth, archThickness * 0.3);
+  
+  // Beam decoration (horizontal lines)
+  fill(stoneDark);
+  rect(beamX, beamY + archThickness * 0.5, beamWidth, pixelSize * 0.15);
+  
+  // Station sign on the arch (optional)
+  fill(255, 255, 255, 200);
+  textAlign(CENTER, CENTER);
+  textSize(pixelSize * 0.35);
+  const signText = stationType === 'start' ? 'START' : 'END';
+  text(signText, portalX, beamY + archThickness / 2);
+}
+
 /* ---------------- Prevenir zoom del navegador ---------------- */
 
 // Prevenir zoom con rueda del ratón + Ctrl/Cmd
