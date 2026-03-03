@@ -17,6 +17,12 @@ let STARTING_LIVES = 3;
 // FPS assumption
 let ASSUMED_FPS = 60;
 
+// ===== FIRE TOGGLES =====
+let TIME_UNTIL_FIRE = 30.0;                    // seconds before fire starts
+let FIRE_SPREAD_INTERVAL_SECONDS = 2.0;        // seconds between each pixel igniting (outer wagons)
+let FIRE_PHASE2_DELAY_SECONDS = 5.0;           // pause after outer wagons burn before middle starts
+let FIRE_PHASE2_SPREAD_INTERVAL_SECONDS = 6.0; // slow spread on middle wagon
+
 // ===== TUNNEL TOGGLES =====
 let TIME_UNTIL_TUNNEL = 1.0;
 let TUNNEL_WARNING_SECONDS = 2.0;
@@ -44,6 +50,21 @@ class Controller {
     this.tapWindowFrames = max(1, floor(TRACK_TAP_WINDOW * ASSUMED_FPS));
     this.deathAfterFrames = max(1, floor(TRACK_DEATH_AFTER * ASSUMED_FPS));
     this.respawnFrames = max(1, floor(RESPAWN_AFTER * ASSUMED_FPS));
+
+    // Fire state
+    this.fireMask = new Array(displaySize).fill(false);
+    this.fireStartFrame = Infinity;
+    this.fireLastSpreadFrame = 0;
+    this.fireSpreadIntervalFrames = max(1, floor(FIRE_SPREAD_INTERVAL_SECONDS * ASSUMED_FPS));
+    this.fireLeftPixel = -1;
+    this.fireRightPixel = -1;
+    this.fireFullyEngulfed = false;
+    this.firePhase2StartFrame = Infinity;
+    this.firePhase2Left = -1;
+    this.firePhase2Right = -1;
+    this.firePhase2IntervalFrames = max(1, floor(FIRE_PHASE2_SPREAD_INTERVAL_SECONDS * ASSUMED_FPS));
+    this.firePhase2LastSpreadFrame = 0;
+    this.firePhase2Done = false;
 
     this.resetTunnelSchedule();
   }
@@ -82,6 +103,12 @@ class Controller {
     this.tunnelWarnFrame = this.tunnelStartFrame - floor(TUNNEL_WARNING_SECONDS * ASSUMED_FPS);
     this.tunnelXFloat = displaySize;
     this.tunnelX = floor(this.tunnelXFloat);
+
+    // Schedule fire
+    this.resetFireState();
+    this.fireStartFrame = frameCount + floor(TIME_UNTIL_FIRE * ASSUMED_FPS);
+    this.fireLeftPixel = this.getWagonStart(0);
+    this.fireRightPixel = this.getWagonEnd(2);
   }
 
   computeTrainLayout() {
@@ -108,18 +135,61 @@ class Controller {
     }
   }
 
+  getWagonStart(wagonIndex) {
+    const trainLength = this.numWagons * this.wagonLength + (this.numWagons - 1) * this.gapLength;
+    const leftPadding = max(0, floor((displaySize - trainLength) / 2));
+    return leftPadding + wagonIndex * (this.wagonLength + this.gapLength);
+  }
+
+  getWagonEnd(wagonIndex) {
+    return this.getWagonStart(wagonIndex) + this.wagonLength - 1;
+  }
+
+  getFireColor(pixelIndex) {
+    const flicker = sin(frameCount * 0.15 + pixelIndex * 2.7);
+    const t = (flicker + 1) * 0.5;
+    const r = 255;
+    const g = floor(lerp(80, 220, t));
+    const b = 0;
+    return color(r, g, b);
+  }
+
+  isFireWarning() {
+    return (
+      this.gameState === "PLAY" &&
+      !this.fireFullyEngulfed &&
+      this.fireStartFrame !== Infinity &&
+      frameCount >= this.fireStartFrame - floor(TUNNEL_WARNING_SECONDS * ASSUMED_FPS) &&
+      frameCount < this.fireStartFrame
+    );
+  }
+
+  resetFireState() {
+    this.fireMask.fill(false);
+    this.fireStartFrame = Infinity;
+    this.fireLastSpreadFrame = 0;
+    this.fireFullyEngulfed = false;
+    this.fireLeftPixel = -1;
+    this.fireRightPixel = -1;
+    this.firePhase2StartFrame = Infinity;
+    this.firePhase2Left = -1;
+    this.firePhase2Right = -1;
+    this.firePhase2LastSpreadFrame = 0;
+    this.firePhase2Done = false;
+  }
+
   randomWagonIndex(avoidIndex = null) {
     const candidates = [];
     for (let i = 0; i < displaySize; i++) {
-      if (this.wagonMask[i] && i !== avoidIndex) candidates.push(i);
+      if (this.wagonMask[i] && i !== avoidIndex && !this.fireMask[i]) candidates.push(i);
     }
-    if (candidates.length === 0) return 0;
+    if (candidates.length === 0) return -1;
     return candidates[floor(random(0, candidates.length))];
   }
 
   spawnPlayerOnWagon(player, avoidIndex = null, specificPosition = null) {
     // Si se especifica una posición, usarla; si no, elegir aleatoria
-    if (specificPosition !== null && controller.wagonMask[specificPosition]) {
+    if (specificPosition !== null && this.wagonMask[specificPosition] && !this.fireMask[specificPosition]) {
       player.position = specificPosition;
     } else {
       player.position = this.randomWagonIndex(avoidIndex);
@@ -191,19 +261,93 @@ class Controller {
     return idx >= this.tunnelX && idx < (this.tunnelX + TUNNEL_WIDTH_PIXELS);
   }
 
+  updateFire() {
+    if (this.gameState !== "PLAY") return;
+    if (this.firePhase2Done) return;
+    if (frameCount < this.fireStartFrame) return;
+
+    // Phase 1: Spread fire on outer wagons
+    if (!this.fireFullyEngulfed) {
+      if (frameCount - this.fireLastSpreadFrame < this.fireSpreadIntervalFrames) return;
+
+      let spread = false;
+      const wagon0End = this.getWagonEnd(0);
+      if (this.fireLeftPixel >= 0 && this.fireLeftPixel <= wagon0End) {
+        this.fireMask[this.fireLeftPixel] = true;
+        this.fireLeftPixel++;
+        spread = true;
+      }
+
+      const wagon2Start = this.getWagonStart(2);
+      if (this.fireRightPixel >= wagon2Start && this.fireRightPixel <= this.getWagonEnd(2)) {
+        this.fireMask[this.fireRightPixel] = true;
+        this.fireRightPixel--;
+        spread = true;
+      }
+
+      if (spread) {
+        this.fireLastSpreadFrame = frameCount;
+      }
+
+      if (this.fireLeftPixel > wagon0End && this.fireRightPixel < wagon2Start) {
+        this.fireFullyEngulfed = true;
+        this.firePhase2StartFrame = frameCount + floor(FIRE_PHASE2_DELAY_SECONDS * ASSUMED_FPS);
+        this.firePhase2Left = this.getWagonStart(1);
+        this.firePhase2Right = this.getWagonEnd(1);
+        this.firePhase2LastSpreadFrame = 0;
+      }
+      return;
+    }
+
+    // Phase 2: Slow creep into middle wagon
+    if (frameCount < this.firePhase2StartFrame) return;
+    if (frameCount - this.firePhase2LastSpreadFrame < this.firePhase2IntervalFrames) return;
+
+    let spread2 = false;
+    const wagon1Start = this.getWagonStart(1);
+    const wagon1End = this.getWagonEnd(1);
+
+    if (this.firePhase2Left <= this.firePhase2Right) {
+      this.fireMask[this.firePhase2Left] = true;
+      this.firePhase2Left++;
+      spread2 = true;
+    }
+
+    if (this.firePhase2Right >= wagon1Start && this.firePhase2Right >= this.firePhase2Left) {
+      this.fireMask[this.firePhase2Right] = true;
+      this.firePhase2Right--;
+      spread2 = true;
+    }
+
+    if (spread2) {
+      this.firePhase2LastSpreadFrame = frameCount;
+    }
+
+    if (this.firePhase2Left > wagon1End) {
+      this.firePhase2Done = true;
+    }
+  }
+
   update() {
     // Always draw wagons row (even on START/GAME_OVER)
     this.computeTrainLayout();
     display.setAllPixels(null);
     for (let i = 0; i < displaySize; i++) {
-      if (this.wagonMask[i]) display.setPixel(i, this.wagonGrey);
+      if (this.wagonMask[i]) {
+        if (this.fireMask[i]) {
+          display.setPixel(i, this.getFireColor(i));
+        } else {
+          display.setPixel(i, this.wagonGrey);
+        }
+      }
     }
 
     if (this.gameState !== "PLAY") return;
 
     // Gameplay only in PLAY
     this.updateTunnel();
-    
+    this.updateFire();
+
     // Check continuous key presses for joystick support
     checkContinuousKeys();
 
@@ -212,16 +356,15 @@ class Controller {
     tickTrackSurvival(playerOne);
 
     applyTunnelHazard(playerOne);
-    
-    // Todos los árboles son obstáculos
     applyTreeHazard(playerOne);
+    applyFireHazard(playerOne);
 
     if (player2Enabled) {
       tickJumpTimer(playerTwo);
       tickTrackSurvival(playerTwo);
       applyTunnelHazard(playerTwo);
       applyTreeHazard(playerTwo);
-
+      applyFireHazard(playerTwo);
     }
   }
 }
@@ -267,6 +410,11 @@ function tickTrackSurvival(player) {
     player.deadFramesLeft--;
     if (player.deadFramesLeft <= 0) {
       if (player.lives > 0) {
+        // Check if any safe wagon pixel exists before respawning
+        if (controller.randomWagonIndex(null) === -1) {
+          controller.gameState = "GAME_OVER";
+          return;
+        }
         // Respawnear en la posición donde murió si es posible
         controller.spawnPlayerOnWagon(player, null, player.deathPosition);
       }
@@ -336,6 +484,18 @@ function applyTreeHazard(player) {
   if (framesSinceDown > controller.tapWindowFrames) {
     killPlayerAndConsumeLife(player);
   }
+}
+
+/* ---------------- Fire hazard ---------------- */
+
+function applyFireHazard(player) {
+  if (controller.gameState !== "PLAY") return;
+  if (player.isDead) return;
+  if (player.isAirborne) return;
+  if (frameCount < player.invulnerableUntil) return;
+  if (!controller.fireMask[player.position]) return;
+
+  killPlayerAndConsumeLife(player);
 }
 
 /* ---------------- Movement Helpers ---------------- */
@@ -505,6 +665,7 @@ function keyPressed() {
     if (key === 'R' || key === 'r') {
       controller.gameState = "START";
       controller.resetTunnelSchedule();
+      controller.resetFireState();
     }
     return;
   }

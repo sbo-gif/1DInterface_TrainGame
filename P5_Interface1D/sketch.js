@@ -90,10 +90,12 @@ function draw() {
 
   // Controller draws wagons row (and gameplay if in PLAY)
   controller.update();
-  
-  // NO dibujar árboles en píxeles 1D - solo visuales grandes
-  // drawTreePixels(); // COMENTADO - los árboles son solo visuales
-  
+
+  // Fire glow overlay (behind the 1D pixel strip, only during play)
+  if (controller.gameState === "PLAY") {
+    drawFireOverlay(yPlayable);
+  }
+
   display.show(yPlayable);
 
   if (controller.gameState === "PLAY") {
@@ -107,6 +109,7 @@ function draw() {
 
     if (controller.tunnelActive) drawTunnelOverlay(yCenter);
     if (controller.isTunnelWarning()) drawWarningText();
+    if (controller.isFireWarning()) drawFireWarningText();
 
     drawLivesUI();
     
@@ -171,6 +174,7 @@ function drawStartScreenOverlay() {
   text("- If you are on the track, keep tapping DOWN (S/K) to survive.", leftX, y); y += line;
   text("- A tunnel arrives after a warning. Duck + keep tapping DOWN to survive.", leftX, y); y += line;
   text("- If you are on a wagon when the tunnel hits you, you die.", leftX, y); y += line;
+  text("- Fire spreads from wagon ends! Retreat to the middle.", leftX, y); y += line;
   text("- Losing all lives ends the game.", leftX, y); y += line;
 
   textAlign(CENTER, BOTTOM);
@@ -414,6 +418,26 @@ function drawWarningText() {
   textAlign(CENTER, CENTER);
   textSize(pixelSize * 0.65);
   text("warning: tunnel", width / 2, pixelSize * 0.9);
+}
+
+function drawFireWarningText() {
+  fill(255, 100, 0);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(pixelSize * 0.65);
+  text("warning: fire approaching", width / 2, pixelSize * 1.6);
+}
+
+function drawFireOverlay(yPlayable) {
+  for (let i = 0; i < displaySize; i++) {
+    if (controller.fireMask[i]) {
+      const flicker = sin(frameCount * 0.1 + i * 1.3);
+      const alpha = map(flicker, -1, 1, 30, 80);
+      noStroke();
+      fill(255, 120, 0, alpha);
+      rect(i * pixelSize - pixelSize * 0.2, yPlayable - pixelSize * 0.3, pixelSize * 1.4, pixelSize * 1.6);
+    }
+  }
 }
 
 /* ---------------- Lives UI + game over ---------------- */
