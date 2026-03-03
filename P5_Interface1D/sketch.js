@@ -263,8 +263,8 @@ function drawTunnelOverlay(yCenter) {
   const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
   const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
 
-  // Highway proportions
-  const shoulderW = max(6, floor(w * 0.1)); // red/white curb width
+  // Highway proportions - más discreto
+  const shoulderW = max(4, floor(w * 0.08)); // Bordes más delgados
   const roadX = x + shoulderW;
   const roadW = w - 2 * shoulderW;
 
@@ -281,8 +281,8 @@ function drawTunnelOverlay(yCenter) {
   // Inner side faces screen center
   const showInnerRightEdge = (cx < width / 2);
 
-  // Shadow band (inner side)
-  const shadowW = pixelSize * 1.2;
+  // Shadow band (inner side) - más sutil
+  const shadowW = pixelSize * 0.8; // Sombra más delgada
   const shadowX = showInnerRightEdge ? (x + w) : (x - shadowW);
 
   // clamp shadow so it doesn’t draw off-canvas
@@ -302,115 +302,98 @@ function drawTunnelOverlay(yCenter) {
     shadowAlpha = constrain(shadowAlpha, 0, 1);
   }
 
-  // ✅ DRAW shadow (you were missing this)
+  // Sombra más discreta
   if (shadowAlpha > 0.001 && sw > 0.5) {
     noStroke();
-    fill(60, 90, 60, 140 * shadowAlpha); // dark green w/ alpha
+    fill(40, 55, 45, 90 * shadowAlpha); // Sombra más sutil
     rect(sx, 0, sw, height);
   }
 
-  // 1) Road deck (grey asphalt)
+  // 1) Road deck - colores más apagados
   noStroke();
-  fill(130);
+  fill(95, 95, 90); // Gris más apagado y verdoso
   rect(roadX, 0, roadW, height);
 
-  // 2) Subtle inner edges (guardrail)
-  fill(90);
-  const railW = max(2, floor(roadW * 0.04));
+  // 2) Bordes muy sutiles
+  fill(70, 70, 68); // Bordes apenas visibles
+  const railW = max(2, floor(roadW * 0.03));
   rect(roadX, 0, railW, height);
   rect(roadX + roadW - railW, 0, railW, height);
 
-  // 3) Shoulders base red
-  fill(200, 40, 40);
+  // 3) Bordes laterales - tonos tierra apagados (en lugar de rojo brillante)
+  fill(85, 75, 65); // Marrón grisáceo
   rect(x, 0, shoulderW, height);
   rect(x + w - shoulderW, 0, shoulderW, height);
 
-  // 4) Alternating white blocks on shoulders
-  const blockH = pixelSize * 1.4;
-  const gapH = pixelSize * 0.4;
+  // 4) Marcas sutiles en bordes (en lugar de bloques blancos brillantes)
+  const blockH = pixelSize * 1.2;
+  const gapH = pixelSize * 0.6;
   const stride = blockH + gapH;
 
   for (let yy = 0; yy < height + stride; yy += stride) {
-    fill(245);
-    rect(x, yy + blockH * 0.35, shoulderW, blockH * 0.55);
-    rect(x + w - shoulderW, yy + blockH * 0.35, shoulderW, blockH * 0.55);
+    fill(105, 100, 92, 180); // Color crema muy apagado, semi-transparente
+    rect(x + shoulderW * 0.2, yy + blockH * 0.4, shoulderW * 0.6, blockH * 0.4);
+    rect(x + w - shoulderW * 0.8, yy + blockH * 0.4, shoulderW * 0.6, blockH * 0.4);
   }
 
-  // 5) Dashed center line
-  const dashW = max(2, floor(roadW * 0.12));
+  // 5) Línea central muy sutil (casi invisible)
+  const dashW = max(2, floor(roadW * 0.08));
   const dashX = roadX + roadW / 2 - dashW / 2;
-  const dashH = pixelSize * 1.2;
-  const dashGap = pixelSize * 0.8;
+  const dashH = pixelSize * 1.0;
+  const dashGap = pixelSize * 1.2;
 
-  fill(245);
+  fill(115, 115, 110, 120); // Línea muy sutil y semi-transparente
   for (let yy = 0; yy < height + dashH; yy += dashH + dashGap) {
     rect(dashX, yy, dashW, dashH);
   }
 
-  // Optional: tiny highlight at the top to make the deck feel "raised"
-  fill(255, 18);
-  rect(roadX, 0, roadW, pixelSize * 0.35);
+  // Highlight muy sutil
+  fill(105, 105, 100, 15);
+  rect(roadX, 0, roadW, pixelSize * 0.25);
 
-  // ✅ Pillars as HORIZONTAL brackets:
-  // long when near edge (shadowAlpha ~ 1), short as approaching center (shadowAlpha -> 0)
+  // Pilares más discretos
   if (shadowAlpha > 0.001) {
     const dir = showInnerRightEdge ? 1 : -1;
 
-    // Base anchor at the inner edge of the road deck (right next to the shadow band)
     const edgeX = showInnerRightEdge ? (x + w) : x;
 
-    // Horizontal length of bracket in pixels:
-    // - long at edge, shrinks toward center
-    const maxLen = pixelSize * 2.0;         // adjust if you want longer
-    const minLen = pixelSize * 0.8;         // small nub before disappearing
+    const maxLen = pixelSize * 1.5;         // Más cortos
+    const minLen = pixelSize * 0.6;
     const bracketLen = lerp(minLen, maxLen, shadowAlpha);
 
-    // Vertical thickness of bracket
-    const bracketH = pixelSize * 0.55;
+    const bracketH = pixelSize * 0.45; // Más delgados
 
-    // ✅ Keep pillars out of the playable corridor with a clearance (same strategy as background trees)
     const pillarClearance = pixelSize * 3.5;
 
-    // For TOP brackets: y is the top of the rect, so subtract bracketH to keep the whole bracket above (trackTop - clearance)
     const baseTopY = (trackTop - pillarClearance) - bracketH;
-
-    // For BOTTOM brackets: y is the top of the rect, so start below (trackBottom + clearance)
     const baseBotY = (trackBottom + pillarClearance);
 
-    // Keep the stack tighter so it never creeps into the corridor
     const offsets = [-pixelSize * 2.0, 0, pixelSize * 2.0];
 
     for (const dy of offsets) {
-      // Top bracket
-      drawBridgePillar(edgeX, baseTopY + dy, bracketLen, bracketH, shadowAlpha, showInnerRightEdge);
-
-      // Bottom bracket
-      drawBridgePillar(edgeX, baseBotY + dy, bracketLen, bracketH, shadowAlpha, showInnerRightEdge);
+      drawBridgePillar(edgeX, baseTopY + dy, bracketLen, bracketH, shadowAlpha * 0.6, showInnerRightEdge); // Reducida opacidad
+      drawBridgePillar(edgeX, baseBotY + dy, bracketLen, bracketH, shadowAlpha * 0.6, showInnerRightEdge);
     }
   }
 }
 
 function drawBridgePillar(edgeX, y, lenX, thickY, alpha01, innerRightEdge) {
-  // Draw a horizontal bracket extending from the inner road edge into the shadow band
   const dir = innerRightEdge ? 1 : -1;
-
-  // If inner side is right, bracket starts at road edge and extends right.
-  // If inner side is left, bracket ends at road edge and extends left.
   const px = innerRightEdge ? edgeX : (edgeX - lenX);
 
   noStroke();
 
-  // subtle drop shadow under the bracket
-  fill(0, 35 * alpha01);
-  rect(px + dir * (pixelSize * 0.15), y + thickY * 0.55, lenX, thickY * 0.55, 2);
+  // Sombra más sutil
+  fill(0, 20 * alpha01);
+  rect(px + dir * (pixelSize * 0.1), y + thickY * 0.5, lenX, thickY * 0.5, 1);
 
-  // main bracket (light concrete)
-  fill(210, 210, 210, 255 * alpha01);
-  rect(px, y, lenX, thickY, 2);
+  // Pilar color concreto apagado
+  fill(120, 120, 115, 255 * alpha01); // Gris verdoso apagado
+  rect(px, y, lenX, thickY, 1);
 
-  // underside shade for quick 3D cue
-  fill(170, 170, 170, 255 * alpha01);
-  rect(px, y + thickY * 0.55, lenX, thickY * 0.45, 2);
+  // Sombra inferior sutil
+  fill(95, 95, 90, 255 * alpha01);
+  rect(px, y + thickY * 0.6, lenX, thickY * 0.4, 1);
 }
 
 function drawWarningText() {
@@ -528,38 +511,96 @@ function drawForestBackground() {
 function drawForestTexture() {
   noStroke();
   
-  // Manchas oscuras que se mueven con el tren
-  // Usar treeOffset para crear movimiento sincronizado
-  randomSeed(42); // Seed fijo para patrones consistentes
+  // Manchas moderadas para textura - SOLO cerca de obstáculos
+  randomSeed(42);
   
+  // Manchas oscuras (moderadas)
   for (let i = 0; i < 50; i++) {
     const baseX = random(width * 2);
     const y = random(height);
-    const size = random(pixelSize * 0.3, pixelSize * 1.5);
+    const size = random(pixelSize * 0.4, pixelSize * 1.5);
     
-    // Aplicar offset de movimiento (mismo que árboles y vías)
     let x = (baseX - treeOffset) % (width * 2);
     if (x < -pixelSize * 4) x += width * 2;
     
-    // Color más oscuro que el fondo
-    fill(20, 40, 25, 60);
+    // NUEVO: Solo dibujar si está cerca de un obstáculo
+    if (!checkIfNearObstacle(baseX, treeOffset)) continue;
     
-    // Forma pixelada (rectángulo)
+    const variant = floor(random(3));
+    if (variant === 0) {
+      fill(20, 40, 25, 50);
+    } else if (variant === 1) {
+      fill(15, 35, 30, 45);
+    } else {
+      fill(25, 45, 28, 48);
+    }
+    
     rect(x, y, size, size);
   }
   
-  // Manchas claras para variedad (luz filtrada)
-  for (let i = 0; i < 30; i++) {
+  // Manchas de tono medio
+  for (let i = 0; i < 35; i++) {
     const baseX = random(width * 2);
-    const y = random(height * 0.4); // Solo en la parte superior
-    const size = random(pixelSize * 0.2, pixelSize * 0.8);
+    const y = random(height);
+    const size = random(pixelSize * 0.3, pixelSize * 1.0);
     
-    // Aplicar offset de movimiento
     let x = (baseX - treeOffset) % (width * 2);
     if (x < -pixelSize * 4) x += width * 2;
     
-    // Color más claro
-    fill(60, 95, 60, 40);
+    // NUEVO: Solo dibujar si está cerca de un obstáculo
+    if (!checkIfNearObstacle(baseX, treeOffset)) continue;
+    
+    const variant = floor(random(3));
+    if (variant === 0) {
+      fill(40, 75, 45, 40);
+    } else if (variant === 1) {
+      fill(35, 70, 50, 38);
+    } else {
+      fill(45, 80, 48, 42);
+    }
+    
+    rect(x, y, size, size);
+  }
+  
+  // Manchas claras brillantes (luz del sol)
+  for (let i = 0; i < 25; i++) {
+    const baseX = random(width * 2.5);
+    const y = random(height * 0.5);
+    const size = random(pixelSize * 0.3, pixelSize * 1.0);
+    
+    let x = (baseX - treeOffset) % (width * 2.5);
+    if (x < -pixelSize * 4) x += width * 2.5;
+    
+    // NUEVO: Solo dibujar si está cerca de un obstáculo
+    if (!checkIfNearObstacle(baseX, treeOffset)) continue;
+    
+    const variant = floor(random(4));
+    if (variant === 0) {
+      fill(80, 130, 75, 35);
+    } else if (variant === 1) {
+      fill(100, 150, 90, 30);
+    } else if (variant === 2) {
+      fill(120, 170, 110, 28);
+    } else {
+      fill(70, 115, 70, 38);
+    }
+    
+    rect(x, y, size, size);
+  }
+  
+  // Manchas pequeñas para textura fina
+  for (let i = 0; i < 40; i++) {
+    const baseX = random(width * 2);
+    const y = random(height);
+    const size = random(pixelSize * 0.2, pixelSize * 0.5);
+    
+    let x = (baseX - treeOffset) % (width * 2);
+    if (x < -pixelSize * 4) x += width * 2;
+    
+    // NUEVO: Solo dibujar si está cerca de un obstáculo
+    if (!checkIfNearObstacle(baseX, treeOffset)) continue;
+    
+    fill(random(20, 50), random(40, 90), random(30, 60), random(25, 45));
     rect(x, y, size, size);
   }
 }
@@ -596,82 +637,130 @@ function drawFatCenterTrackBand(yCenter, offsetPx) {
 function initializeTrees() {
   trees = [];
   
-  // PRIMERO: Crear algunos árboles ESPECÍFICAMENTE sobre las vías (middle)
-  const numMiddleTrees = 5; // Árboles sobre las vías (obstáculos)
+  // PRIMERO: Crear árboles OBSTÁCULO sobre las vías (middle)
+  const numMiddleTrees = 5;
+  const obstaclePositions = []; // Guardar posiciones para crear clusters
+  
   for (let i = 0; i < numMiddleTrees; i++) {
     let layer = 'foreground'; 
     let scale = random(2.0, 3.5);
+    let xPos = random(width * 2);
     
     trees.push({
-      x: random(width * 2),
-      type: floor(random(6)), // Ahora 6 tipos diferentes
+      x: xPos,
+      type: floor(random(6)),
       scale: scale,
       layer: layer,
       yPosition: 'middle',
-      colorVariant: floor(random(4)) // 4 variantes de color
+      yOffset: 0, // Sin offset para obstáculos
+      colorVariant: floor(random(4))
     });
+    
+    // Guardar posición del obstáculo
+    obstaclePositions.push(xPos);
   }
   
-  // SEGUNDO: Crear MUCHÍSIMOS árboles de fondo (lejos) - bosque MUY denso
-  const numFarTrees = 80; // Mucho más denso
-  for (let i = 0; i < numFarTrees; i++) {
-    let yPos = (random() < 0.5) ? 'top' : 'bottom';
-    let scale = random(0.4, 1.2);
+  // SEGUNDO: Crear CLUSTERS de árboles alrededor de cada obstáculo
+  for (let obstacleX of obstaclePositions) {
+    // Radio del cluster alrededor del obstáculo
+    const clusterRadius = pixelSize * 8;
     
+    // Crear árboles en la capa FAR (fondo lejano) - MUY LEJOS de las vías
+    const numFarInCluster = 8;
+    for (let i = 0; i < numFarInCluster; i++) {
+      let xOffset = random(-clusterRadius, clusterRadius);
+      let yPos = (random() < 0.5) ? 'top' : 'bottom';
+      let yOffset = random(pixelSize * 4, pixelSize * 10); // Lejos de las vías
+      
+      trees.push({
+        x: obstacleX + xOffset,
+        type: floor(random(6)),
+        scale: random(0.5, 1.0),
+        layer: 'far',
+        yPosition: yPos,
+        yOffset: yOffset,
+        colorVariant: floor(random(4))
+      });
+    }
+    
+    // Crear árboles en la capa MID (medio) - DISTANCIA MEDIA
+    const numMidInCluster = 6;
+    for (let i = 0; i < numMidInCluster; i++) {
+      let xOffset = random(-clusterRadius * 0.8, clusterRadius * 0.8);
+      let yPos = (random() < 0.5) ? 'top' : 'bottom';
+      let yOffset = random(pixelSize * 2, pixelSize * 6); // Distancia media
+      
+      trees.push({
+        x: obstacleX + xOffset,
+        type: floor(random(6)),
+        scale: random(1.0, 1.6),
+        layer: 'mid',
+        yPosition: yPos,
+        yOffset: yOffset,
+        colorVariant: floor(random(4))
+      });
+    }
+    
+    // Crear árboles en la capa CLOSE (cercanos) - CERCA de las vías
+    const numCloseInCluster = 4;
+    for (let i = 0; i < numCloseInCluster; i++) {
+      let xOffset = random(-clusterRadius * 0.6, clusterRadius * 0.6);
+      let yPos = (random() < 0.5) ? 'top' : 'bottom';
+      let yOffset = random(pixelSize * 0.5, pixelSize * 3); // Cerca de las vías
+      
+      trees.push({
+        x: obstacleX + xOffset,
+        type: floor(random(6)),
+        scale: random(1.6, 2.3),
+        layer: 'close',
+        yPosition: yPos,
+        yOffset: yOffset,
+        colorVariant: floor(random(4))
+      });
+    }
+    
+    // Crear árboles en FOREGROUND (primer plano) - MUY VARIADO
+    const numForegroundInCluster = 3;
+    for (let i = 0; i < numForegroundInCluster; i++) {
+      let xOffset = random(-clusterRadius * 0.5, clusterRadius * 0.5);
+      let yPos = (random() < 0.5) ? 'top' : 'bottom';
+      let yOffset = random(pixelSize * 0.3, pixelSize * 5); // Variado
+      
+      trees.push({
+        x: obstacleX + xOffset,
+        type: floor(random(6)),
+        scale: random(2.5, 3.8),
+        layer: 'foreground',
+        yPosition: yPos,
+        yOffset: yOffset,
+        colorVariant: floor(random(4))
+      });
+    }
+  }
+  
+  // TERCERO: Añadir algunos árboles de relleno dispersos con variación vertical
+  const numFillerFar = 10;
+  for (let i = 0; i < numFillerFar; i++) {
     trees.push({
-      x: random(width * 4), // Distribuidos en área más amplia
+      x: random(width * 4),
       type: floor(random(6)),
-      scale: scale,
+      scale: random(0.5, 1.0),
       layer: 'far',
-      yPosition: yPos,
+      yPosition: (random() < 0.5) ? 'top' : 'bottom',
+      yOffset: random(pixelSize * 4, pixelSize * 12),
       colorVariant: floor(random(4))
     });
   }
   
-  // TERCERO: Crear MUCHÍSIMOS árboles de capa media - bosque MUY denso
-  const numMidTrees = 60;
-  for (let i = 0; i < numMidTrees; i++) {
-    let yPos = (random() < 0.5) ? 'top' : 'bottom';
-    let scale = random(0.9, 1.8);
-    
+  const numFillerMid = 8;
+  for (let i = 0; i < numFillerMid; i++) {
     trees.push({
-      x: random(width * 3.5),
+      x: random(width * 3),
       type: floor(random(6)),
-      scale: scale,
+      scale: random(1.0, 1.5),
       layer: 'mid',
-      yPosition: yPos,
-      colorVariant: floor(random(4))
-    });
-  }
-  
-  // CUARTO: Crear MUCHÍSIMOS árboles cercanos (no en las vías) - bosque MUY denso
-  const numCloseTrees = 45;
-  for (let i = 0; i < numCloseTrees; i++) {
-    let yPos = (random() < 0.5) ? 'top' : 'bottom';
-    let scale = random(1.5, 2.5);
-    
-    trees.push({
-      x: random(width * 2.5),
-      type: floor(random(6)),
-      scale: scale,
-      layer: 'close',
-      yPosition: yPos,
-      colorVariant: floor(random(4))
-    });
-  }
-  
-  // QUINTO: Crear árboles de primer plano adicionales (no en vías)
-  const numForegroundTrees = 12;
-  for (let i = 0; i < numForegroundTrees; i++) {
-    let yPos = (random() < 0.5) ? 'top' : 'bottom';
-    let scale = random(2.5, 4.0);
-    
-    trees.push({
-      x: random(width * 2),
-      type: floor(random(6)),
-      scale: scale,
-      layer: 'foreground',
-      yPosition: yPos,
+      yPosition: (random() < 0.5) ? 'top' : 'bottom',
+      yOffset: random(pixelSize * 2, pixelSize * 7),
       colorVariant: floor(random(4))
     });
   }
@@ -683,7 +772,7 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
   const yPlayable = yCenter - pixelSize / 2;
   const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
   const trackBottom = yPlayable + pixelSize + TRACK_STYLE.sleeperOverhangPx;
-  const clearance = pixelSize * 1.5; //  keeps trees away from track
+  const clearance = pixelSize * 1.5; // Clearance base
 
   noStroke();
   
@@ -699,94 +788,219 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
     
     const s = pixelSize * tree.scale;
     
-    // Dibujar árbol según su posición vertical asignada
+    // Obtener offset vertical del árbol (si existe)
+    const yOffset = tree.yOffset || 0;
+    
+    // Indicar si es obstáculo (middle position)
+    const isObstacle = (tree.yPosition === 'middle');
+    
+    // NUEVO: Si es árbol de fondo (no obstáculo), verificar si está cerca de un obstáculo
+    if (!isObstacle) {
+      // Calcular si este árbol está cerca de algún obstáculo
+      const isNearObstacle = checkIfNearObstacle(tree.x, treeOffset);
+      
+      // Si no está cerca de ningún obstáculo, no dibujar (mostrar césped)
+      if (!isNearObstacle) continue;
+    }
+    
+    // Dibujar árbol según su posición vertical asignada CON offset personalizado
     if (tree.yPosition === 'top') {
-      drawTree(x, (trackTop - clearance) - s * 2, s, tree.type, opacityMultiplier);
+      // Arriba de las vías - offset negativo (más lejos = más arriba)
+      drawTree(x, (trackTop - clearance - yOffset) - s * 2, s, tree.type, opacityMultiplier, tree.colorVariant, isObstacle);
     } else if (tree.yPosition === 'middle') {
       // Árbol metido en las vías - centrado en la línea del tren
-      drawTree(x, yPlayable - s * 0.3, s, tree.type, opacityMultiplier);
+      drawTree(x, yPlayable - s * 0.3, s, tree.type, opacityMultiplier, tree.colorVariant, isObstacle);
     } else {
-      drawTree(x, (trackBottom + clearance) + s * 0.5, s, tree.type, opacityMultiplier);
+      // Abajo de las vías - offset positivo (más lejos = más abajo)
+      drawTree(x, (trackBottom + clearance + yOffset) + s * 0.5, s, tree.type, opacityMultiplier, tree.colorVariant, isObstacle);
     }
   }
 }
 
-function drawTree(x, y, size, type, opacity) {
+// Verificar si un árbol de fondo está cerca de algún obstáculo
+function checkIfNearObstacle(treeX, currentOffset) {
+  // Radio de influencia del bosque alrededor de cada obstáculo
+  const forestRadius = pixelSize * 12; // Ajustable
+  
+  // Verificar distancia a cada obstáculo
+  for (let tree of trees) {
+    if (tree.yPosition !== 'middle') continue; // Solo obstáculos
+    
+    // Calcular posición del obstáculo en el mundo
+    let obstacleX = tree.x;
+    
+    // Calcular distancia considerando el wrapping del mundo
+    let dist = abs(treeX - obstacleX);
+    
+    // Considerar wrapping (el mundo es cíclico)
+    const worldWidth = width * 2;
+    if (dist > worldWidth / 2) {
+      dist = worldWidth - dist;
+    }
+    
+    // Si está dentro del radio, hay bosque aquí
+    if (dist < forestRadius) {
+      return true;
+    }
+  }
+  
+  return false; // No hay obstáculos cerca = césped
+}
+
+function drawTree(x, y, size, type, opacity, colorVariant = 0, isObstacle = false) {
   push();
   noStroke();
   
-  // Árboles pixelados estilizados inspirados en bosques naturales
-  // Paleta de colores más rica y natural
+  // Si es obstáculo, hacer el árbol más estrecho
+  const widthMultiplier = isObstacle ? 0.6 : 1.0;
   
+  // Paleta de colores inspirada en la imagen - tonalidades variadas de verde
+  const colorPalettes = [
+    // Variante 0: Verde oscuro profundo
+    { dark: [25, 60, 30], mid: [35, 75, 40], light: [45, 90, 50], highlight: [55, 105, 60] },
+    // Variante 1: Verde medio
+    { dark: [35, 75, 40], mid: [50, 95, 55], light: [70, 120, 70], highlight: [90, 140, 85] },
+    // Variante 2: Verde claro brillante
+    { dark: [60, 110, 60], mid: [80, 135, 75], light: [110, 165, 100], highlight: [140, 190, 120] },
+    // Variante 3: Verde azulado oscuro
+    { dark: [20, 55, 45], mid: [30, 70, 55], light: [40, 85, 65], highlight: [50, 100, 75] }
+  ];
+  
+  const palette = colorPalettes[colorVariant % 4];
+  
+  // Árboles con forma más orgánica y manchada (inspirados en la imagen de referencia)
   if (type === 0) {
-    // Árbol tipo 1: Roble frondoso con copa redondeada
-    // Copa exterior (más oscura)
-    fill(28, 70, 35, 255 * opacity); // Verde bosque profundo
-    rect(x - size * 0.4, y + size * 0.25, size * 0.8, size * 0.6);
-    rect(x - size * 0.3, y + size * 0.15, size * 0.6, size * 0.1);
-    rect(x - size * 0.3, y + size * 0.85, size * 0.6, size * 0.1);
+    // Árbol tipo 1: Copa irregular con capas superpuestas
+    // Base oscura grande
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.5 * widthMultiplier, y + size * 0.3, size * widthMultiplier, size * 0.5);
+    rect(x - size * 0.4 * widthMultiplier, y + size * 0.2, size * 0.8 * widthMultiplier, size * 0.2);
+    rect(x - size * 0.3 * widthMultiplier, y + size * 0.15, size * 0.6 * widthMultiplier, size * 0.05);
     
-    // Copa interior (más clara - luz del sol)
-    fill(40, 90, 45, 255 * opacity); // Verde medio iluminado
-    rect(x - size * 0.25, y + size * 0.35, size * 0.5, size * 0.4);
+    // Capas medias irregulares
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.45 * widthMultiplier, y + size * 0.35, size * 0.6 * widthMultiplier, size * 0.4);
+    rect(x - size * 0.2 * widthMultiplier, y + size * 0.25, size * 0.5 * widthMultiplier, size * 0.3);
     
-    // Detalles de luz (highlights)
-    fill(55, 110, 55, 200 * opacity); // Verde claro
-    rect(x - size * 0.15, y + size * 0.4, size * 0.3, size * 0.15);
+    // Manchas claras superpuestas
+    fill(palette.light[0], palette.light[1], palette.light[2], 240 * opacity);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.4, size * 0.4 * widthMultiplier, size * 0.25);
+    rect(x - size * 0.15 * widthMultiplier, y + size * 0.3, size * 0.35 * widthMultiplier, size * 0.2);
     
-    // Tronco robusto con textura
-    fill(65, 45, 25, 255 * opacity); // Marrón corteza
-    rect(x - size * 0.1, y + size * 0.85, size * 0.2, size * 0.25);
+    // Highlights brillantes
+    fill(palette.highlight[0], palette.highlight[1], palette.highlight[2], 200 * opacity);
+    rect(x - size * 0.25 * widthMultiplier, y + size * 0.45, size * 0.25 * widthMultiplier, size * 0.15);
+    rect(x, y + size * 0.35, size * 0.2 * widthMultiplier, size * 0.12);
     
-    // Sombra del tronco
-    fill(45, 30, 18, 180 * opacity);
-    rect(x + size * 0.02, y + size * 0.9, size * 0.08, size * 0.2);
+    // Tronco
+    fill(70, 50, 30, 255 * opacity);
+    rect(x - size * 0.1 * widthMultiplier, y + size * 0.75, size * 0.2 * widthMultiplier, size * 0.3);
     
   } else if (type === 1) {
-    // Árbol tipo 2: Pino/conífera elegante
-    // Copa triangular en capas
-    fill(25, 65, 30, 255 * opacity); // Verde pino oscuro
+    // Árbol tipo 2: Forma redondeada con muchas manchas
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.45 * widthMultiplier, y + size * 0.25, size * 0.9 * widthMultiplier, size * 0.6);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.15, size * 0.4 * widthMultiplier, size * 0.1);
+    rect(x - size * 0.1 * widthMultiplier, y + size * 0.18, size * 0.45 * widthMultiplier, size * 0.12);
     
-    // Capa inferior (más ancha)
-    rect(x - size * 0.35, y + size * 0.65, size * 0.7, size * 0.15);
-    // Capa media
-    rect(x - size * 0.28, y + size * 0.5, size * 0.56, size * 0.15);
-    rect(x - size * 0.22, y + size * 0.35, size * 0.44, size * 0.15);
-    // Capa superior (punta)
-    rect(x - size * 0.15, y + size * 0.25, size * 0.3, size * 0.1);
-    rect(x - size * 0.08, y + size * 0.18, size * 0.16, size * 0.07);
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.4 * widthMultiplier, y + size * 0.3, size * 0.5 * widthMultiplier, size * 0.45);
+    rect(x - size * 0.1 * widthMultiplier, y + size * 0.35, size * 0.45 * widthMultiplier, size * 0.35);
     
-    // Highlights en las capas (nieve o luz)
-    fill(50, 100, 50, 180 * opacity);
-    rect(x - size * 0.18, y + size * 0.52, size * 0.36, size * 0.08);
-    rect(x - size * 0.12, y + size * 0.37, size * 0.24, size * 0.08);
+    fill(palette.light[0], palette.light[1], palette.light[2], 240 * opacity);
+    rect(x - size * 0.3 * widthMultiplier, y + size * 0.38, size * 0.35 * widthMultiplier, size * 0.3);
+    rect(x + size * 0.05 * widthMultiplier, y + size * 0.42, size * 0.25 * widthMultiplier, size * 0.22);
     
-    // Tronco delgado
-    fill(70, 50, 30, 255 * opacity);
-    rect(x - size * 0.07, y + size * 0.75, size * 0.14, size * 0.28);
+    fill(palette.highlight[0], palette.highlight[1], palette.highlight[2], 200 * opacity);
+    rect(x - size * 0.22 * widthMultiplier, y + size * 0.45, size * 0.2 * widthMultiplier, size * 0.18);
+    
+    // Tronco
+    fill(75, 55, 35, 255 * opacity);
+    rect(x - size * 0.09 * widthMultiplier, y + size * 0.78, size * 0.18 * widthMultiplier, size * 0.25);
+    
+  } else if (type === 2) {
+    // Árbol tipo 3: Pino con capas irregulares
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.4 * widthMultiplier, y + size * 0.55, size * 0.8 * widthMultiplier, size * 0.2);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.4, size * 0.7 * widthMultiplier, size * 0.18);
+    rect(x - size * 0.28 * widthMultiplier, y + size * 0.28, size * 0.56 * widthMultiplier, size * 0.15);
+    rect(x - size * 0.2 * widthMultiplier, y + size * 0.18, size * 0.4 * widthMultiplier, size * 0.12);
+    
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.3 * widthMultiplier, y + size * 0.45, size * 0.6 * widthMultiplier, size * 0.15);
+    rect(x - size * 0.22 * widthMultiplier, y + size * 0.32, size * 0.44 * widthMultiplier, size * 0.12);
+    
+    fill(palette.light[0], palette.light[1], palette.light[2], 220 * opacity);
+    rect(x - size * 0.18 * widthMultiplier, y + size * 0.48, size * 0.36 * widthMultiplier, size * 0.1);
+    rect(x - size * 0.12 * widthMultiplier, y + size * 0.35, size * 0.24 * widthMultiplier, size * 0.08);
+    
+    // Tronco
+    fill(65, 45, 25, 255 * opacity);
+    rect(x - size * 0.08 * widthMultiplier, y + size * 0.72, size * 0.16 * widthMultiplier, size * 0.3);
+    
+  } else if (type === 3) {
+    // Árbol tipo 4: Arbusto bajo y ancho con textura irregular
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.55 * widthMultiplier, y + size * 0.45, size * 1.1 * widthMultiplier, size * 0.45);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.35, size * 0.7 * widthMultiplier, size * 0.15);
+    
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.45 * widthMultiplier, y + size * 0.5, size * 0.6 * widthMultiplier, size * 0.35);
+    rect(x - size * 0.15 * widthMultiplier, y + size * 0.48, size * 0.5 * widthMultiplier, size * 0.32);
+    
+    fill(palette.light[0], palette.light[1], palette.light[2], 240 * opacity);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.55, size * 0.4 * widthMultiplier, size * 0.25);
+    rect(x + size * 0.05 * widthMultiplier, y + size * 0.53, size * 0.25 * widthMultiplier, size * 0.22);
+    
+    fill(palette.highlight[0], palette.highlight[1], palette.highlight[2], 200 * opacity);
+    rect(x - size * 0.25 * widthMultiplier, y + size * 0.6, size * 0.3 * widthMultiplier, size * 0.15);
+    
+    // Tronco
+    fill(72, 52, 32, 255 * opacity);
+    rect(x - size * 0.1 * widthMultiplier, y + size * 0.83, size * 0.2 * widthMultiplier, size * 0.2);
+    
+  } else if (type === 4) {
+    // Árbol tipo 5: Copa alta con manchas irregulares
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.35 * widthMultiplier, y + size * 0.2, size * 0.7 * widthMultiplier, size * 0.65);
+    rect(x - size * 0.25 * widthMultiplier, y + size * 0.12, size * 0.5 * widthMultiplier, size * 0.08);
+    
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.3 * widthMultiplier, y + size * 0.25, size * 0.4 * widthMultiplier, size * 0.5);
+    rect(x - size * 0.15 * widthMultiplier, y + size * 0.3, size * 0.4 * widthMultiplier, size * 0.4);
+    
+    fill(palette.light[0], palette.light[1], palette.light[2], 240 * opacity);
+    rect(x - size * 0.25 * widthMultiplier, y + size * 0.35, size * 0.3 * widthMultiplier, size * 0.35);
+    rect(x - size * 0.08 * widthMultiplier, y + size * 0.38, size * 0.25 * widthMultiplier, size * 0.28);
+    
+    fill(palette.highlight[0], palette.highlight[1], palette.highlight[2], 200 * opacity);
+    rect(x - size * 0.18 * widthMultiplier, y + size * 0.42, size * 0.22 * widthMultiplier, size * 0.22);
+    
+    // Tronco
+    fill(68, 48, 28, 255 * opacity);
+    rect(x - size * 0.09 * widthMultiplier, y + size * 0.8, size * 0.18 * widthMultiplier, size * 0.25);
     
   } else {
-    // Árbol tipo 3: Árbol de hoja perenne bajo (arbusto grande)
-    // Copa redondeada y densa
-    fill(30, 75, 38, 255 * opacity); // Verde medio-oscuro
-    rect(x - size * 0.35, y + size * 0.4, size * 0.7, size * 0.45);
-    rect(x - size * 0.25, y + size * 0.3, size * 0.5, size * 0.1);
+    // Árbol tipo 6: Forma compacta con muchas manchas superpuestas
+    fill(palette.dark[0], palette.dark[1], palette.dark[2], 255 * opacity);
+    rect(x - size * 0.42 * widthMultiplier, y + size * 0.4, size * 0.84 * widthMultiplier, size * 0.5);
+    rect(x - size * 0.32 * widthMultiplier, y + size * 0.32, size * 0.64 * widthMultiplier, size * 0.15);
     
-    // Parte interna más clara
-    fill(42, 88, 45, 255 * opacity); // Verde medio
-    rect(x - size * 0.25, y + size * 0.5, size * 0.5, size * 0.25);
+    fill(palette.mid[0], palette.mid[1], palette.mid[2], 255 * opacity);
+    rect(x - size * 0.38 * widthMultiplier, y + size * 0.45, size * 0.5 * widthMultiplier, size * 0.4);
+    rect(x - size * 0.12 * widthMultiplier, y + size * 0.42, size * 0.48 * widthMultiplier, size * 0.38);
     
-    // Highlights superiores
-    fill(58, 105, 58, 200 * opacity); // Verde claro
-    rect(x - size * 0.18, y + size * 0.45, size * 0.36, size * 0.15);
+    fill(palette.light[0], palette.light[1], palette.light[2], 240 * opacity);
+    rect(x - size * 0.28 * widthMultiplier, y + size * 0.52, size * 0.35 * widthMultiplier, size * 0.28);
+    rect(x - size * 0.05 * widthMultiplier, y + size * 0.48, size * 0.32 * widthMultiplier, size * 0.25);
     
-    // Tronco corto y grueso
-    fill(68, 48, 28, 255 * opacity);
-    rect(x - size * 0.09, y + size * 0.8, size * 0.18, size * 0.22);
+    fill(palette.highlight[0], palette.highlight[1], palette.highlight[2], 200 * opacity);
+    rect(x - size * 0.2 * widthMultiplier, y + size * 0.58, size * 0.25 * widthMultiplier, size * 0.18);
+    rect(x + size * 0.05 * widthMultiplier, y + size * 0.55, size * 0.18 * widthMultiplier, size * 0.15);
     
-    // Sombra
-    fill(48, 32, 20, 160 * opacity);
-    rect(x + size * 0.01, y + size * 0.85, size * 0.08, size * 0.17);
+    // Tronco
+    fill(70, 50, 30, 255 * opacity);
+    rect(x - size * 0.08 * widthMultiplier, y + size * 0.82, size * 0.16 * widthMultiplier, size * 0.2);
   }
   
   pop();
