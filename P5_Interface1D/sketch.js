@@ -1,6 +1,7 @@
 // sketch.js
 
 let displaySize = 30;
+// pixelSize is computed in setup() to fill the window
 let pixelSize = 25;
 
 let playerOne;
@@ -34,12 +35,14 @@ let sleeperSpeed = 1.5; // Reducido a la mitad (antes era 3)
 let mapProgress = 0; // 0 to 1 (0 = start station, 1 = end station)
 let mapProgressSpeed = 0.00048; // Speed adjusted for ~35 second game
 
-// Start station building position
-let stationBuildingX = 0; // X position (scrolls left as game progresses)
-
-// End station building position (appears when close to finish)
-let endStationX = 0; // X position (starts off-screen right, moves left)
-let endStationAppearProgress = 0.60; // Progress threshold to show end station (60% for shorter game)
+// Station building positions
+let stationBuildingX = 0; // Start station X (starts centered, scrolls left)
+let endStationX = 0;      // End station scroll offset (scrolls in from right)
+// endStationAppearProgress is computed in setup() so the station
+// arrives centered on screen exactly when mapProgress reaches 1.0
+let endStationAppearProgress = 0.90;
+// Start station: same width as end station, begins centered
+let startStationCenterX = 0; // computed in setup()
 
 // Game start countdown (train waits at station)
 let gameStartCountdown = 3.0; // seconds to wait before train starts moving
@@ -110,7 +113,15 @@ function stopSoundSafe(sound) {
 }
 
 function setup() {
-  // Taller canvas to fit instructions comfortably
+  // Fill the window while maintaining aspect ratio (displaySize : 20 = 3:2)
+  const aspectRatio = displaySize / 20;
+  if (windowWidth / windowHeight > aspectRatio) {
+    // Window is wider — fit to height
+    pixelSize = floor(windowHeight / 20);
+  } else {
+    // Window is taller — fit to width
+    pixelSize = floor(windowWidth / displaySize);
+  }
   createCanvas(displaySize * pixelSize, pixelSize * 20);
 
   display = new Display(displaySize, pixelSize);
@@ -134,8 +145,50 @@ function setup() {
   // Inicializar árboles
   initializeTrees();
 
+  // Start station begins centered on screen
+  const stationW = width * 0.5;
+  startStationCenterX = (width - stationW) / 2; // centered
+  stationBuildingX = startStationCenterX; // set initial position
+
+  // Calculate when end station should appear so it arrives centered at mapProgress=1.0
+  // Station starts at (width + pixelSize*2), needs to reach startStationCenterX (centered)
+  const stationScrollDist = (width + pixelSize * 2) - startStationCenterX;
+  const framesNeeded = stationScrollDist / sleeperSpeed;
+  const progressNeeded = framesNeeded * mapProgressSpeed;
+  endStationAppearProgress = max(0.5, 1.0 - progressNeeded);
+
   // Ensure layout exists for drawing wagons row even on START
   controller.computeTrainLayout();
+}
+
+function windowResized() {
+  const aspectRatio = displaySize / 20;
+  if (windowWidth / windowHeight > aspectRatio) {
+    pixelSize = floor(windowHeight / 20);
+  } else {
+    pixelSize = floor(windowWidth / displaySize);
+  }
+  resizeCanvas(displaySize * pixelSize, pixelSize * 20);
+
+  // Update display's cached pixelSize
+  display.pixelSize = pixelSize;
+
+  // Recalculate track geometry
+  TRACK_STYLE.railThicknessPx = max(3, pixelSize * 0.12);
+  TRACK_STYLE.sleeperWidthPx = pixelSize * 0.95;
+  TRACK_STYLE.sleeperOverhangPx = pixelSize * 0.55;
+  TRACK_STYLE.sleeperStridePx = pixelSize * 2;
+
+  // Recalculate station positions
+  const stationW = width * 0.5;
+  startStationCenterX = (width - stationW) / 2;
+  const stationScrollDist = (width + pixelSize * 2) - startStationCenterX;
+  const framesNeeded = stationScrollDist / sleeperSpeed;
+  const progressNeeded = framesNeeded * mapProgressSpeed;
+  endStationAppearProgress = max(0.5, 1.0 - progressNeeded);
+
+  // Reinitialize trees for new dimensions
+  initializeTrees();
 }
 
 function draw() {
@@ -159,11 +212,10 @@ function draw() {
 
   if (showCenterTrack) drawFatCenterTrackBand(yCenter, sleeperOffset);
 
-  // Draw start station building (scrolls left as game progresses)
-  if (controller.gameState === "PLAY") {
-    drawStationBuilding(yCenter);
-    drawEndStationBuilding(yCenter);
-  }
+  // Draw station buildings (background scenery, above the track)
+  // Visible on START (centered), PLAY (scrolling), and VICTORY
+  drawStationBuilding(yCenter);
+  drawEndStationBuilding(yCenter);
 
   // Controller draws wagons row (and gameplay if in PLAY)
   controller.update();
@@ -216,6 +268,10 @@ function draw() {
       const elapsedSeconds = (frameCount - controller.gameStartFrame) / 60;
       if (elapsedSeconds >= gameStartCountdown) {
         isTrainMoving = true;
+        // Give fresh 3-second invulnerability now that hazards are live
+        // (spawn-time invulnerability has already expired during the countdown)
+        playerOne.invulnerableUntil = frameCount + 180;
+        if (player2Enabled) playerTwo.invulnerableUntil = frameCount + 180;
         // Play train moving sound when train starts
         playSoundSafeLooped(soundTrainMoving);
       } else {
@@ -245,8 +301,11 @@ function draw() {
       // Move station building to the left (same speed as sleepers/track)
       stationBuildingX -= sleeperSpeed;
       
-      // Move end station from right to left (same speed)
-      endStationX -= sleeperSpeed;
+      // Move end station from right to left (same speed as trees)
+      // Only start scrolling once the station should appear
+      if (mapProgress >= endStationAppearProgress) {
+        endStationX -= sleeperSpeed;
+      }
     }
     
     // Check if reached the end
@@ -386,11 +445,6 @@ function drawStartScreenOverlay() {
   text("Train surfing", width / 2, height * 0.12);
   textSize(pixelSize * 1.8);
   text("kills.", width / 2, height * 0.19);
-  
-  // Mensaje secundario DEBAJO del título (como en la imagen de referencia)
-  fill(255, 255, 255); // Blanco
-  textSize(pixelSize * 0.75);
-  text("Ride inside. Stay alive.", width / 2, height * 0.26);
   
   // Instrucción para empezar
   fill(255, 255, 255, 200);
@@ -740,10 +794,10 @@ function drawGameOver() {
 }
 
 function drawVictoryScreen() {
-  // Victory overlay
-  fill(0, 0, 0, 180);
+  // Semi-transparent overlay so station shows through
+  fill(0, 0, 0, 120);
   rect(0, 0, width, height);
-  
+
   // Victory message
   fill(255, 220, 50); // Gold
   noStroke();
@@ -751,17 +805,17 @@ function drawVictoryScreen() {
   textStyle(BOLD);
   textSize(pixelSize * 1.2);
   text("YOU ARRIVED!", width / 2, height * 0.4);
-  
+
   // Sub message
   fill(255, 255, 255);
   textSize(pixelSize * 0.6);
   text("You reached the destination station", width / 2, height * 0.5);
-  
+
   // Restart instruction
   fill(255, 255, 255, 200);
   textSize(pixelSize * 0.5);
   text("Press R to restart", width / 2, height * 0.65);
-  
+
   textStyle(NORMAL);
 }
 
@@ -963,16 +1017,19 @@ function drawFatCenterTrackBand(yCenter, offsetPx) {
 
 function initializeTrees() {
   trees = [];
-  
+
   // PRIMERO: Crear árboles OBSTÁCULO sobre las vías (middle)
-  const numMiddleTrees = 5;
+  // Reducido a 2 obstáculos, espaciados uniformemente para evitar agrupamiento
+  const numMiddleTrees = 2;
   const obstaclePositions = []; // Guardar posiciones para crear clusters
-  
+
   for (let i = 0; i < numMiddleTrees; i++) {
-    let layer = 'foreground'; 
+    let layer = 'foreground';
     let scale = random(2.0, 3.5);
-    let xPos = random(width * 2);
-    
+    // Evenly spaced with jitter so trees are never too close together
+    let baseX = width * 2 * (i + 1) / (numMiddleTrees + 1);
+    let xPos = baseX + random(-width * 0.15, width * 0.15);
+
     trees.push({
       x: xPos,
       type: floor(random(6)),
@@ -982,23 +1039,23 @@ function initializeTrees() {
       yOffset: 0, // Sin offset para obstáculos
       colorVariant: floor(random(4))
     });
-    
+
     // Guardar posición del obstáculo
     obstaclePositions.push(xPos);
   }
-  
+
   // SEGUNDO: Crear CLUSTERS de árboles alrededor de cada obstáculo
   for (let obstacleX of obstaclePositions) {
     // Radio del cluster alrededor del obstáculo
     const clusterRadius = pixelSize * 8;
-    
+
     // Crear árboles en la capa FAR (fondo lejano) - MUY LEJOS de las vías
-    const numFarInCluster = 8;
+    const numFarInCluster = 4;
     for (let i = 0; i < numFarInCluster; i++) {
       let xOffset = random(-clusterRadius, clusterRadius);
       let yPos = (random() < 0.5) ? 'top' : 'bottom';
       let yOffset = random(pixelSize * 4, pixelSize * 10); // Lejos de las vías
-      
+
       trees.push({
         x: obstacleX + xOffset,
         type: floor(random(6)),
@@ -1009,14 +1066,14 @@ function initializeTrees() {
         colorVariant: floor(random(4))
       });
     }
-    
+
     // Crear árboles en la capa MID (medio) - DISTANCIA MEDIA
-    const numMidInCluster = 6;
+    const numMidInCluster = 3;
     for (let i = 0; i < numMidInCluster; i++) {
       let xOffset = random(-clusterRadius * 0.8, clusterRadius * 0.8);
       let yPos = (random() < 0.5) ? 'top' : 'bottom';
       let yOffset = random(pixelSize * 2, pixelSize * 6); // Distancia media
-      
+
       trees.push({
         x: obstacleX + xOffset,
         type: floor(random(6)),
@@ -1027,14 +1084,14 @@ function initializeTrees() {
         colorVariant: floor(random(4))
       });
     }
-    
+
     // Crear árboles en la capa CLOSE (cercanos) - CERCA de las vías
-    const numCloseInCluster = 4;
+    const numCloseInCluster = 2;
     for (let i = 0; i < numCloseInCluster; i++) {
       let xOffset = random(-clusterRadius * 0.6, clusterRadius * 0.6);
       let yPos = (random() < 0.5) ? 'top' : 'bottom';
       let yOffset = random(pixelSize * 0.5, pixelSize * 3); // Cerca de las vías
-      
+
       trees.push({
         x: obstacleX + xOffset,
         type: floor(random(6)),
@@ -1045,14 +1102,14 @@ function initializeTrees() {
         colorVariant: floor(random(4))
       });
     }
-    
-    // Crear árboles en FOREGROUND (primer plano) - MUY VARIADO
-    const numForegroundInCluster = 3;
+
+    // Crear árboles en FOREGROUND (primer plano) - solo 1 por obstáculo
+    const numForegroundInCluster = 1;
     for (let i = 0; i < numForegroundInCluster; i++) {
       let xOffset = random(-clusterRadius * 0.5, clusterRadius * 0.5);
       let yPos = (random() < 0.5) ? 'top' : 'bottom';
       let yOffset = random(pixelSize * 0.3, pixelSize * 5); // Variado
-      
+
       trees.push({
         x: obstacleX + xOffset,
         type: floor(random(6)),
@@ -1064,9 +1121,9 @@ function initializeTrees() {
       });
     }
   }
-  
+
   // TERCERO: Añadir algunos árboles de relleno dispersos con variación vertical
-  const numFillerFar = 10;
+  const numFillerFar = 5;
   for (let i = 0; i < numFillerFar; i++) {
     trees.push({
       x: random(width * 4),
@@ -1078,8 +1135,8 @@ function initializeTrees() {
       colorVariant: floor(random(4))
     });
   }
-  
-  const numFillerMid = 8;
+
+  const numFillerMid = 4;
   for (let i = 0; i < numFillerMid; i++) {
     trees.push({
       x: random(width * 3),
@@ -1175,7 +1232,7 @@ function drawTreeLayer(yCenter, layerName, speedMultiplier, opacityMultiplier) {
 // Verificar si un árbol de fondo está cerca de algún obstáculo
 function checkIfNearObstacle(treeX, currentOffset) {
   // Radio de influencia del bosque alrededor de cada obstáculo
-  const forestRadius = pixelSize * 12; // Ajustable
+  const forestRadius = pixelSize * 8; // Tighter clusters, less clutter
   
   // Verificar distancia a cada obstáculo
   for (let tree of trees) {
@@ -1388,9 +1445,32 @@ function treeCoversIndex(idx) {
   // Only trees that are BOTH:
   // 1) on the playable row ("middle")
   // 2) in the foreground layer (the only layer currently drawn)
+  // 3) currently visible (respecting the progressive difficulty filter)
+
+  // Apply the same progressive difficulty filter used in drawTreeLayer
+  let treeChance = 1.0;
+  if (controller.gameState === "PLAY" && isTrainMoving) {
+    const gameTime = (frameCount - controller.gameStartFrame) / 60;
+    if (gameTime < 5) {
+      treeChance = 0.2;
+    } else if (gameTime < 10) {
+      treeChance = 0.5;
+    } else if (gameTime < 15) {
+      treeChance = 0.75;
+    }
+  }
+
   for (let tree of trees) {
     if (tree.yPosition !== 'middle') continue;
-    if (tree.layer !== 'foreground') continue; // ✅ NEW: ignore invisible layers
+    if (tree.layer !== 'foreground') continue;
+
+    // Skip trees hidden by progressive difficulty (same logic as drawTreeLayer)
+    if (treeChance < 1.0) {
+      randomSeed(tree.x * 1000);
+      const visible = random() <= treeChance;
+      randomSeed(frameCount);
+      if (!visible) continue;
+    }
 
     let worldX = tree.x - treeOffset;
     const loopWidth = width * 2;
@@ -1435,64 +1515,150 @@ function drawMiniMap() {
   ellipse(dotX, dotY, dotSize, dotSize);
 }
 
-/* ---------------- Station Building (simple brown box) ---------------- */
+/* ---------------- MBTA-style Station — TOP-DOWN / bird's eye (pixely) ----------- */
 
-function drawStationBuilding(yCenter) {
+function drawMBTAStation(xLeft, yCenter) {
   const yPlayable = yCenter - pixelSize / 2;
-  
-  // Building position (scrolls left with track movement)
-  const buildingX = stationBuildingX;
-  
-  // Only draw if still visible on screen
-  if (buildingX < -pixelSize * 4) return;
-  
-  // Simple brown box (like mini-map station) - más estrecho
-  const boxWidth = pixelSize * 2; // Reducido de 3 a 2
-  const boxTop = yPlayable - pixelSize * 2;
-  const boxHeight = pixelSize * 5;
-  
+  const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
+
+  const stW = width * 0.5;
+  if (xLeft > width + stW || xLeft + stW < -stW) return;
+
   noStroke();
-  
-  // Dark brown box (matches mini-map color)
-  fill(120, 90, 50);
-  rect(buildingX, boxTop, boxWidth, boxHeight);
-  
-  // Darker inner shadow
-  fill(90, 70, 40);
-  rect(buildingX + boxWidth * 0.7, boxTop, boxWidth * 0.3, boxHeight);
+
+  // Bird's eye: station sits above (north of) the track.
+  const platBottom = trackTop - pixelSize * 0.08;
+
+  // ── 1. PLATFORM (sunlit concrete) ──
+  const platH = pixelSize * 2.5;
+  const platTop = platBottom - platH;
+
+  fill(195, 188, 175);
+  rect(xLeft, platTop, stW, platH);
+
+  // Chunky paver grid — thick visible lines
+  fill(175, 168, 155);
+  const paverCols = floor(stW / (pixelSize * 2));
+  for (let i = 1; i < paverCols; i++) {
+    rect(xLeft + stW * i / paverCols, platTop, pixelSize * 0.1, platH);
+  }
+  // Two horizontal grooves
+  rect(xLeft, platTop + platH * 0.33, stW, pixelSize * 0.08);
+  rect(xLeft, platTop + platH * 0.66, stW, pixelSize * 0.08);
+
+  // Far curb (thick)
+  fill(155, 148, 138);
+  rect(xLeft, platTop, stW, pixelSize * 0.25);
+
+  // ── 2. CANOPY SHADOW ──
+  const canopyH = pixelSize * 1.6;
+  const overhang = pixelSize * 0.4;
+  const canopyTop = platTop + pixelSize * 0.35;
+  const canopyLeft = xLeft - overhang;
+  const canopyW = stW + overhang * 2;
+
+  fill(0, 0, 0, 45);
+  rect(canopyLeft + pixelSize * 0.15, canopyTop + pixelSize * 0.15, canopyW, canopyH);
+
+  // ── 3. CANOPY ROOF (dark corrugated metal) ──
+  fill(58, 55, 50);
+  rect(canopyLeft, canopyTop, canopyW, canopyH);
+
+  // Bold corrugation — 3 thick alternating bands
+  const bandH = canopyH / 3;
+  fill(68, 64, 56);
+  rect(canopyLeft, canopyTop, canopyW, bandH);
+  fill(50, 47, 42);
+  rect(canopyLeft, canopyTop + bandH, canopyW, bandH);
+  fill(62, 58, 52);
+  rect(canopyLeft, canopyTop + bandH * 2, canopyW, bandH);
+
+  // Panel seams — thick vertical dividers
+  fill(42, 40, 36);
+  const numSeams = 5;
+  for (let i = 1; i < numSeams; i++) {
+    rect(canopyLeft + canopyW * i / numSeams, canopyTop, pixelSize * 0.15, canopyH);
+  }
+
+  // Ridge cap — bold center stripe
+  fill(88, 82, 72);
+  rect(canopyLeft, canopyTop + canopyH * 0.45, canopyW, pixelSize * 0.2);
+
+  // Top eave
+  fill(78, 72, 64);
+  rect(canopyLeft, canopyTop, canopyW, pixelSize * 0.15);
+
+  // Bottom eave (lighter, catches light)
+  fill(98, 92, 82);
+  rect(canopyLeft, canopyTop + canopyH - pixelSize * 0.15, canopyW, pixelSize * 0.15);
+
+  // ── 4. PILLAR SQUARES (chunky pixel columns from above) ──
+  const numPillars = 5;
+  const pSize = pixelSize * 0.3;
+  const pY = canopyTop + canopyH - pSize - pixelSize * 0.15;
+  for (let i = 0; i < numPillars; i++) {
+    const px = xLeft + stW * (i + 0.5) / numPillars - pSize / 2;
+    // Shadow
+    fill(0, 0, 0, 35);
+    rect(px + pixelSize * 0.08, pY + pixelSize * 0.08, pSize, pSize);
+    // Pillar
+    fill(150, 150, 155);
+    rect(px, pY, pSize, pSize);
+    // Highlight corner
+    fill(185, 185, 190);
+    rect(px, pY, pSize * 0.4, pSize * 0.4);
+  }
+
+  // ── 5. YELLOW SAFETY LINE (thick strip) ──
+  const safetyH = pixelSize * 0.3;
+  fill(235, 195, 45);
+  rect(xLeft, platBottom - safetyH, stW, safetyH);
+  // Bold tactile dots
+  fill(210, 170, 30);
+  const numBumps = floor(stW / (pixelSize * 1.5));
+  for (let i = 0; i < numBumps; i++) {
+    const bx = xLeft + pixelSize * 0.5 + i * (stW - pixelSize) / max(1, numBumps - 1);
+    rect(bx - pixelSize * 0.1, platBottom - safetyH * 0.75, pixelSize * 0.2, pixelSize * 0.15);
+  }
+
+  // ── 6. MAROON SIGN BAND (MBTA fascia) ──
+  const signH = pixelSize * 0.45;
+  const signTop = canopyTop + canopyH;
+  fill(140, 35, 70);
+  rect(xLeft, signTop, stW, signH);
+  // Lighter accent strip
+  fill(175, 50, 85);
+  rect(xLeft, signTop, stW, pixelSize * 0.08);
+
+  // Sign text — big and bold
+  fill(255, 255, 255);
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(pixelSize * 0.32);
+  text("STATION", xLeft + stW / 2, signTop + signH / 2);
+  textStyle(NORMAL);
+
+  // ── 7. BENCHES (chunky rectangles) ──
+  const benchW = pixelSize * 0.8;
+  const benchD = pixelSize * 0.2;
+  const benchY = signTop + signH + pixelSize * 0.12;
+  fill(95, 78, 55);
+  rect(xLeft + stW * 0.25 - benchW / 2, benchY, benchW, benchD);
+  rect(xLeft + stW * 0.75 - benchW / 2, benchY, benchW, benchD);
 }
 
-/* ---------------- End Station Building (appears near finish) ---------------- */
+/* ---------------- Start Station (begins centered, scrolls left) ---------------- */
+
+function drawStationBuilding(yCenter) {
+  drawMBTAStation(stationBuildingX, yCenter);
+}
+
+/* ---------------- End Station (scrolls in from right, arrives centered) ---------------- */
 
 function drawEndStationBuilding(yCenter) {
-  // Only show when close to finish
   if (mapProgress < endStationAppearProgress) return;
-  
-  const yPlayable = yCenter - pixelSize / 2;
-  
-  // Building position (scrolls left with track movement)
-  // Starts from right side of screen when it appears
-  const progressSinceAppear = (mapProgress - endStationAppearProgress) / (1.0 - endStationAppearProgress);
-  const initialX = width + pixelSize * 2;
-  const buildingX = initialX + endStationX;
-  
-  // Only draw if visible on screen
-  if (buildingX > width + pixelSize * 4 || buildingX < -pixelSize * 4) return;
-  
-  // Simple brown box (like mini-map station) - same as start station
-  const boxWidth = pixelSize * 2;
-  const boxTop = yPlayable - pixelSize * 2;
-  const boxHeight = pixelSize * 5;
-  
-  noStroke();
-  
-  // Dark brown box (matches mini-map color)
-  fill(120, 90, 50);
-  rect(buildingX, boxTop, boxWidth, boxHeight);
-  
-  // Darker inner shadow
-  fill(90, 70, 40);
-  rect(buildingX + boxWidth * 0.7, boxTop, boxWidth * 0.3, boxHeight);
+  const buildingX = width + pixelSize * 2 + endStationX;
+  drawMBTAStation(buildingX, yCenter);
 }
 
 /* ---------------- Station Tunnel (simple brown box) ---------------- */

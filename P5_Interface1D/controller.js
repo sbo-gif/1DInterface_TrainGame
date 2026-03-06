@@ -93,7 +93,7 @@ class Controller {
 
     // Reset map progress
     mapProgress = 0;
-    stationBuildingX = 0; // Reset station building position
+    stationBuildingX = startStationCenterX; // Start station begins centered
     endStationX = 0; // Reset end station position
     isTrainMoving = false; // Reset train movement flag
 
@@ -728,18 +728,6 @@ function keyPressed() {
     return;
   }
 
-  // Player 1
-  if (key === 'A' || key === 'a') tryMoveSide(playerOne, -1);
-  if (key === 'D' || key === 'd') tryMoveSide(playerOne, 1);
-  if (key === 'S' || key === 's') handleDownPress(playerOne);
-  if (key === 'W' || key === 'w') tryJump(playerOne);
-
-  // Player 2
-  if (player2Enabled) {
-    if (key === 'J' || key === 'j') tryMoveSide(playerTwo, -1);
-    if (key === 'L' || key === 'l') tryMoveSide(playerTwo, 1);
-    if (key === 'K' || key === 'k') handleDownPress(playerTwo);
-    if (key === 'I' || key === 'i') tryJump(playerTwo);  
-  }
-  
+  // Movement is handled entirely by checkContinuousKeys() in the game loop
+  // to avoid double-firing (keyPressed + checkContinuousKeys on the same frame)
 }
