@@ -437,10 +437,10 @@ function drawStartScreenOverlay() {
   rect(centerX + ps * 4.2, centerY + ps * 4.5, ps * 1.8, ps * 1.2);
   
   // Texto principal estilo póster
-  fill(255, 220, 0); // Amarillo brillante
+  fill(255, 0, 0); // Red
   textAlign(CENTER, CENTER);
   textStyle(BOLD);
-  
+
   textSize(pixelSize * 1.6);
   text("Train surfing", width / 2, height * 0.12);
   textSize(pixelSize * 1.8);
@@ -786,11 +786,30 @@ function drawLifeRow(x, y, c, livesLeft) {
 }
 
 function drawGameOver() {
-  fill(0);
+  // Dark overlay
+  fill(0, 0, 0, 180);
+  rect(0, 0, width, height);
+
+  // GAME OVER title
+  fill(255, 0, 0);
   noStroke();
   textAlign(CENTER, CENTER);
-  textSize(pixelSize * 0.7);
-  text("GAME OVER (press R)", width / 2, pixelSize * 1.4);
+  textStyle(BOLD);
+  textSize(pixelSize * 1.0);
+  text("GAME OVER", width / 2, height * 0.25);
+
+  // PSA message
+  fill(255, 255, 255);
+  textStyle(NORMAL);
+  textSize(pixelSize * 0.45);
+  text("Train surfing is extremely dangerous and illegal.", width / 2, height * 0.42);
+  text("Every year, people are killed or seriously injured.", width / 2, height * 0.50);
+  text("No thrill is worth your life. Stay off the tracks.", width / 2, height * 0.58);
+
+  // Restart instruction
+  fill(255, 255, 255, 180);
+  textSize(pixelSize * 0.4);
+  text("Press R to restart", width / 2, height * 0.75);
 }
 
 function drawVictoryScreen() {
@@ -809,7 +828,7 @@ function drawVictoryScreen() {
   // Sub message
   fill(255, 255, 255);
   textSize(pixelSize * 0.6);
-  text("You reached the destination station", width / 2, height * 0.5);
+  text("You reached MIT / Kendall Square", width / 2, height * 0.5);
 
   // Restart instruction
   fill(255, 255, 255, 200);
@@ -1517,7 +1536,7 @@ function drawMiniMap() {
 
 /* ---------------- MBTA-style Station — TOP-DOWN / bird's eye (pixely) ----------- */
 
-function drawMBTAStation(xLeft, yCenter) {
+function drawMBTAStation(xLeft, yCenter, stationName) {
   const yPlayable = yCenter - pixelSize / 2;
   const trackTop = yPlayable - TRACK_STYLE.sleeperOverhangPx;
 
@@ -1635,7 +1654,7 @@ function drawMBTAStation(xLeft, yCenter) {
   textAlign(CENTER, CENTER);
   textStyle(BOLD);
   textSize(pixelSize * 0.32);
-  text("STATION", xLeft + stW / 2, signTop + signH / 2);
+  text(stationName || "STATION", xLeft + stW / 2, signTop + signH / 2);
   textStyle(NORMAL);
 
   // ── 7. BENCHES (chunky rectangles) ──
@@ -1650,7 +1669,7 @@ function drawMBTAStation(xLeft, yCenter) {
 /* ---------------- Start Station (begins centered, scrolls left) ---------------- */
 
 function drawStationBuilding(yCenter) {
-  drawMBTAStation(stationBuildingX, yCenter);
+  drawMBTAStation(stationBuildingX, yCenter, "HARVARD SQUARE");
 }
 
 /* ---------------- End Station (scrolls in from right, arrives centered) ---------------- */
@@ -1658,7 +1677,7 @@ function drawStationBuilding(yCenter) {
 function drawEndStationBuilding(yCenter) {
   if (mapProgress < endStationAppearProgress) return;
   const buildingX = width + pixelSize * 2 + endStationX;
-  drawMBTAStation(buildingX, yCenter);
+  drawMBTAStation(buildingX, yCenter, "MIT / KENDALL SQ");
 }
 
 /* ---------------- Station Tunnel (simple brown box) ---------------- */
@@ -1782,7 +1801,7 @@ function drawStationPortal(yCenter, stationType) {
   fill(255, 255, 255, 200);
   textAlign(CENTER, CENTER);
   textSize(pixelSize * 0.35);
-  const signText = stationType === 'start' ? 'START' : 'END';
+  const signText = stationType === 'start' ? 'Harvard Square' : 'MIT / Kendall Square';
   text(signText, portalX, beamY + archThickness / 2);
 }
 

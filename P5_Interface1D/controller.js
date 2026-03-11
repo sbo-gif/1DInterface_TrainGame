@@ -14,6 +14,9 @@ let BLINK_PERIOD_PANIC_MIN = 4;
 // Lives
 let STARTING_LIVES = 3;
 
+// Movement repeat delay (frames) – lower = faster side-to-side movement
+let MOVE_REPEAT_FRAMES = 8;
+
 // FPS assumption
 let ASSUMED_FPS = 60;
 
@@ -650,23 +653,26 @@ let prevKeysDown = {
   j: false, l: false, k: false, i: false
 };
 
+// Frame counters for movement repeat debounce
+let moveHeldFrames = { a: 0, d: 0, j: 0, l: 0 };
+
 // Check continuous key presses (for joystick support)
 function checkContinuousKeys() {
   if (controller.gameState !== "PLAY") return;
   
-  // Player 1 - Movement (A/D) needs to be triggered once per press
+  // Player 1 - Movement (A/D) fires on first press, then repeats every MOVE_REPEAT_FRAMES
   if (keyIsDown(65)) { // A
-    if (!prevKeysDown.a) tryMoveSide(playerOne, -1);
-    prevKeysDown.a = true;
+    if (moveHeldFrames.a === 0) tryMoveSide(playerOne, -1);
+    moveHeldFrames.a = (moveHeldFrames.a + 1) % MOVE_REPEAT_FRAMES;
   } else {
-    prevKeysDown.a = false;
+    moveHeldFrames.a = 0;
   }
-  
+
   if (keyIsDown(68)) { // D
-    if (!prevKeysDown.d) tryMoveSide(playerOne, 1);
-    prevKeysDown.d = true;
+    if (moveHeldFrames.d === 0) tryMoveSide(playerOne, 1);
+    moveHeldFrames.d = (moveHeldFrames.d + 1) % MOVE_REPEAT_FRAMES;
   } else {
-    prevKeysDown.d = false;
+    moveHeldFrames.d = 0;
   }
   
   // S needs to be called every frame while held (for survival)
@@ -682,19 +688,19 @@ function checkContinuousKeys() {
     prevKeysDown.w = false;
   }
   
-  // Player 2 - Movement (J/L) needs to be triggered once per press
+  // Player 2 - Movement (J/L) fires on first press, then repeats every MOVE_REPEAT_FRAMES
   if (keyIsDown(74)) { // J
-    if (!prevKeysDown.j) tryMoveSide(playerTwo, -1);
-    prevKeysDown.j = true;
+    if (moveHeldFrames.j === 0) tryMoveSide(playerTwo, -1);
+    moveHeldFrames.j = (moveHeldFrames.j + 1) % MOVE_REPEAT_FRAMES;
   } else {
-    prevKeysDown.j = false;
+    moveHeldFrames.j = 0;
   }
-  
+
   if (keyIsDown(76)) { // L
-    if (!prevKeysDown.l) tryMoveSide(playerTwo, 1);
-    prevKeysDown.l = true;
+    if (moveHeldFrames.l === 0) tryMoveSide(playerTwo, 1);
+    moveHeldFrames.l = (moveHeldFrames.l + 1) % MOVE_REPEAT_FRAMES;
   } else {
-    prevKeysDown.l = false;
+    moveHeldFrames.l = 0;
   }
   
   // K needs to be called every frame while held (for survival)

@@ -46,22 +46,14 @@ void loop() {
   unsigned long now = millis();
 
   if (now - lastSample >= WINDOW_MS) {
-    // int delta = abs(current - history);
+    int delta = abs(current - history);
 
     Serial.println(current);
-    // if (delta >= THRESHOLD) {
-    //   if (current <= END_LOW) {
-    //     Serial.println("SLAMMED TO BOTTOM");
-    //   } else if (current >= END_HIGH) {
-    //     Serial.println("SLAMMED TO TOP");
-    //   }
-    // }
-
-      if (current <= END_LOW) {
-        Keyboard.write('S');
-      } else if (current >= END_HIGH) {
-        Keyboard.write('W');
-      }
+    if (delta >= THRESHOLD && current >= END_HIGH) {
+      Keyboard.write('W');
+    } else if (current <= END_LOW) {
+      Keyboard.write('S');
+    }
 
     history = current;
     lastSample = now;
