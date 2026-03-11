@@ -801,10 +801,8 @@ function drawGameOver() {
   // PSA message
   fill(255, 255, 255);
   textStyle(NORMAL);
-  textSize(pixelSize * 0.45);
-  text("Train surfing is extremely dangerous and illegal.", width / 2, height * 0.42);
-  text("Every year, people are killed or seriously injured.", width / 2, height * 0.50);
-  text("No thrill is worth your life. Stay off the tracks.", width / 2, height * 0.58);
+  textSize(pixelSize * 0.65);
+  text("You have to figure out some other way to commute for free!!", width / 2, height * 0.45);
 
   // Restart instruction
   fill(255, 255, 255, 180);

@@ -2,12 +2,12 @@
 #include <Keyboard.h>      // include library that let's Arduino act as a keyboard
 
 
-RotaryEncoder encoder(16, 15);
+RotaryEncoder encoder(15, 16);
 const int POT_PIN = A1;
-const int THRESHOLD = 300;      // how big a change counts as "big" (out of 1023)
+const int THRESHOLD = 50;      // how big a change counts as "big" (out of 1023)
 const int WINDOW_MS = 200;      // time window to detect the change
 const int END_LOW = 800;        // "bottom" zone
-const int END_HIGH = 1010;      // "top" zone
+const int END_HIGH = 1000;      // "top" zone
 
 int history = 512;
 unsigned long lastSample = 0;
@@ -28,10 +28,10 @@ void loop() {
     Serial.println(newPos);
     if (pos < newPos) {
       Keyboard.write('D');
-    } 
+    }
     if (pos > newPos) {
       Keyboard.write('A');
-    } 
+    }
     // else {
     //   Keyboard.write('D');
     // }
@@ -42,7 +42,7 @@ void loop() {
   // int val = analogRead(A1); // returns 0–1023
   // Serial.println(val);
 
-    int current = analogRead(POT_PIN);
+  int current = analogRead(POT_PIN);
   unsigned long now = millis();
 
   if (now - lastSample >= WINDOW_MS) {
@@ -52,7 +52,7 @@ void loop() {
     if (delta >= THRESHOLD && current >= END_HIGH) {
       Keyboard.write('W');
     } else if (current <= END_LOW) {
-      Keyboard.write('S');
+       Keyboard.write('S');
     }
 
     history = current;

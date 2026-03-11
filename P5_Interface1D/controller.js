@@ -14,9 +14,6 @@ let BLINK_PERIOD_PANIC_MIN = 4;
 // Lives
 let STARTING_LIVES = 3;
 
-// Movement repeat delay (frames) – lower = faster side-to-side movement
-let MOVE_REPEAT_FRAMES = 8;
-
 // FPS assumption
 let ASSUMED_FPS = 60;
 
@@ -647,74 +644,10 @@ function tryJump(player) {
 
 /* ---------------- Keyboard Controls ---------------- */
 
-// Track which keys were pressed in previous frame (to detect new presses)
-let prevKeysDown = {
-  a: false, d: false, s: false, w: false,
-  j: false, l: false, k: false, i: false
-};
-
-// Frame counters for movement repeat debounce
-let moveHeldFrames = { a: 0, d: 0, j: 0, l: 0 };
-
-// Check continuous key presses (for joystick support)
+// All input handled via keyPressed – each keydown event = one action.
+// Works reliably with keyboard emulators that only send keydown events.
 function checkContinuousKeys() {
-  if (controller.gameState !== "PLAY") return;
-  
-  // Player 1 - Movement (A/D) fires on first press, then repeats every MOVE_REPEAT_FRAMES
-  if (keyIsDown(65)) { // A
-    if (moveHeldFrames.a === 0) tryMoveSide(playerOne, -1);
-    moveHeldFrames.a = (moveHeldFrames.a + 1) % MOVE_REPEAT_FRAMES;
-  } else {
-    moveHeldFrames.a = 0;
-  }
-
-  if (keyIsDown(68)) { // D
-    if (moveHeldFrames.d === 0) tryMoveSide(playerOne, 1);
-    moveHeldFrames.d = (moveHeldFrames.d + 1) % MOVE_REPEAT_FRAMES;
-  } else {
-    moveHeldFrames.d = 0;
-  }
-  
-  // S needs to be called every frame while held (for survival)
-  if (keyIsDown(83)) { // S
-    handleDownPress(playerOne);
-  }
-  
-  // W needs to be triggered once per press
-  if (keyIsDown(87)) { // W
-    if (!prevKeysDown.w) tryJump(playerOne);
-    prevKeysDown.w = true;
-  } else {
-    prevKeysDown.w = false;
-  }
-  
-  // Player 2 - Movement (J/L) fires on first press, then repeats every MOVE_REPEAT_FRAMES
-  if (keyIsDown(74)) { // J
-    if (moveHeldFrames.j === 0) tryMoveSide(playerTwo, -1);
-    moveHeldFrames.j = (moveHeldFrames.j + 1) % MOVE_REPEAT_FRAMES;
-  } else {
-    moveHeldFrames.j = 0;
-  }
-
-  if (keyIsDown(76)) { // L
-    if (moveHeldFrames.l === 0) tryMoveSide(playerTwo, 1);
-    moveHeldFrames.l = (moveHeldFrames.l + 1) % MOVE_REPEAT_FRAMES;
-  } else {
-    moveHeldFrames.l = 0;
-  }
-  
-  // K needs to be called every frame while held (for survival)
-  if (keyIsDown(75)) { // K
-    handleDownPress(playerTwo);
-  }
-  
-  // I needs to be triggered once per press
-  if (keyIsDown(73)) { // I
-    if (!prevKeysDown.i) tryJump(playerTwo);
-    prevKeysDown.i = true;
-  } else {
-    prevKeysDown.i = false;
-  }
+  // No-op: all input now handled in keyPressed()
 }
 
 function keyPressed() {
@@ -734,6 +667,17 @@ function keyPressed() {
     return;
   }
 
-  // Movement is handled entirely by checkContinuousKeys() in the game loop
-  // to avoid double-firing (keyPressed + checkContinuousKeys on the same frame)
+  if (controller.gameState !== "PLAY") return;
+
+  // Player 1 (match by key string or keyCode for emulator compatibility)
+  if (key === 'a' || key === 'A' || keyCode === 65) tryMoveSide(playerOne, -1);
+  if (key === 'd' || key === 'D' || keyCode === 68) tryMoveSide(playerOne, 1);
+  if (key === 's' || key === 'S' || keyCode === 83) handleDownPress(playerOne);
+  if (key === 'w' || key === 'W' || keyCode === 87) tryJump(playerOne);
+
+  // Player 2
+  if (key === 'j' || key === 'J' || keyCode === 74) tryMoveSide(playerTwo, -1);
+  if (key === 'l' || key === 'L' || keyCode === 76) tryMoveSide(playerTwo, 1);
+  if (key === 'k' || key === 'K' || keyCode === 75) handleDownPress(playerTwo);
+  if (key === 'i' || key === 'I' || keyCode === 73) tryJump(playerTwo);
 }
