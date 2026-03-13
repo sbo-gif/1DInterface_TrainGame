@@ -25,7 +25,7 @@ let soundPlayerLand;
 let soundsLoaded = false;
 
 // Choose to be a 1- or 2-player game
-let player2Enabled = false;  // 🔁 CHANGE TO false for 1-player mode
+let player2Enabled = true;  // 🔁 CHANGE TO false for 1-player mode
 
 // Track animation (runs even on START screen)
 let sleeperOffset = 0;
@@ -126,8 +126,8 @@ function setup() {
 
   display = new Display(displaySize, pixelSize);
 
-  playerOne = new Player(color(255, 0, 0), 0, displaySize);
-  playerTwo = new Player(color(0, 0, 255), 0, displaySize);
+  playerOne = new Player(color(255, 255, 0), 0, displaySize);
+  playerTwo = new Player(color(0, 0, 0), 0, displaySize);
 
   controller = new Controller();
 
@@ -445,6 +445,14 @@ function drawStartScreenOverlay() {
   text("Train surfing", width / 2, height * 0.12);
   textSize(pixelSize * 1.8);
   text("kills.", width / 2, height * 0.19);
+
+  fill(0, 0, 0); // Black
+  textAlign(CENTER,CENTER);
+  textStyle(BOLD);
+
+  textSize(pixelSize * 0.6);
+  text("Stay alive", width / 2, height * 0.28);
+
   
   // Instrucción para empezar
   fill(255, 255, 255, 200);
@@ -1043,9 +1051,12 @@ function initializeTrees() {
   for (let i = 0; i < numMiddleTrees; i++) {
     let layer = 'foreground';
     let scale = random(2.0, 3.5);
-    // Evenly spaced with jitter so trees are never too close together
-    let baseX = width * 2 * (i + 1) / (numMiddleTrees + 1);
-    let xPos = baseX + random(-width * 0.15, width * 0.15);
+
+    // Start ALL obstacle trees off-screen to the right,
+    // so they always enter from the right edge first.
+    const spawnMinX = width + pixelSize * 6;
+    const spacing = width * 0.45;   // distance between obstacle clusters
+    let xPos = spawnMinX + i * spacing + random(0, width * 0.12);
 
     trees.push({
       x: xPos,
@@ -1053,11 +1064,10 @@ function initializeTrees() {
       scale: scale,
       layer: layer,
       yPosition: 'middle',
-      yOffset: 0, // Sin offset para obstáculos
+      yOffset: 0,
       colorVariant: floor(random(4))
     });
 
-    // Guardar posición del obstáculo
     obstaclePositions.push(xPos);
   }
 

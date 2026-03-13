@@ -153,13 +153,16 @@ class Controller {
   }
 
   getFireColor(pixelIndex) {
-    const flicker = sin(frameCount * 0.15 + pixelIndex * 2.7);
-    const t = (flicker + 1) * 0.5;
-    const r = 255;
-    const g = floor(lerp(80, 220, t));
-    const b = 0;
-    return color(r, g, b);
-  }
+  const flicker = sin(frameCount * 0.15 + pixelIndex * 2.7);
+  const t = (flicker + 1) * 0.5;
+
+  // Flicker between orange and deep red
+  const r = floor(lerp(200, 255, t));  // red intensity shifts
+  const g = floor(lerp(20, 90, t));    // small green range (keeps orange tone)
+  const b = 0;
+
+  return color(r, g, b);
+}
 
   isFireWarning() {
     return (
@@ -404,16 +407,16 @@ function tickJumpTimer(player) {
 
 function killPlayerAndConsumeLife(player) {
   if (player.isDead) return;
-  
-  const playerName = (player === playerOne) ? "Player 1 (Red)" : "Player 2 (Blue)";
+
+  const playerName = (player === playerOne) ? "Player 1 (Yellow)" : "Player 2 (Black)";
   console.log(`💀 ${playerName} DIED at frame ${frameCount}, position ${player.position}, mode ${player.mode}`);
-  
+
   // Play death sound
   if (typeof playSoundSafe === 'function' && typeof soundPlayerDeath !== 'undefined') {
     playSoundSafe(soundPlayerDeath);
   }
-  
-  // Guardar la posición donde murió
+
+  // Save death position for possible respawn
   player.deathPosition = player.position;
 
   player.lives = max(0, player.lives - 1);
@@ -424,9 +427,14 @@ function killPlayerAndConsumeLife(player) {
   player.isAirborne = false;
   player.airborneFramesLeft = 0;
 
-  if (player.lives <= 0) {
+  // Only game over if this is a 1-player game, or if BOTH players are now out of lives
+  const shouldGameOver = player2Enabled
+  ? (playerOne.lives <= 0 && playerTwo.lives <= 0)
+  : (playerOne.lives <= 0);
+  
+  if (shouldGameOver) {
     controller.gameState = "GAME_OVER";
-    // Stop train sound on game over
+
     if (typeof stopSoundSafe === 'function' && typeof soundTrainMoving !== 'undefined') {
       stopSoundSafe(soundTrainMoving);
     }
@@ -436,22 +444,29 @@ function killPlayerAndConsumeLife(player) {
 function tickTrackSurvival(player) {
   if (controller.gameState !== "PLAY") return;
 
+  // Handle dead player / respawn / permanent elimination
   if (player.isDead) {
     player.deadFramesLeft--;
+
     if (player.deadFramesLeft <= 0) {
       if (player.lives > 0) {
-        // Check if any safe wagon pixel exists before respawning
-        if (controller.randomWagonIndex(null) === -1) {
-          controller.gameState = "GAME_OVER";
-          return;
+        // Try to respawn only if a safe wagon pixel exists
+        if (controller.randomWagonIndex(null) !== -1) {
+          controller.spawnPlayerOnWagon(player, null, player.deathPosition);
+        } else {
+          // No safe place to respawn right now:
+          // keep the player dead and wait a little longer, but DO NOT end the game
+          player.deadFramesLeft = controller.respawnFrames;
         }
-        // Respawnear en la posición donde murió si es posible
-        controller.spawnPlayerOnWagon(player, null, player.deathPosition);
+      } else {
+        // Permanently eliminated: stay dead, do nothing else
+        player.deadFramesLeft = 0;
       }
     }
     return;
   }
 
+  // Regular track survival logic
   if (player.mode !== "TRACK") return;
 
   const framesSinceDown = frameCount - (player.lastDownFrame ?? 0);
